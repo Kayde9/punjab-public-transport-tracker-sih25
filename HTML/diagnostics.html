@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Diagnostics - Punjab Transport Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <!-- Leaflet for map testing -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-stethoscope text-blue-600 mr-2"></i>
+                System Diagnostics
+            </h1>
+            <p class="text-gray-600">Punjab Transport Tracker - System Health Check</p>
+        </div>
+
+        <!-- Quick Status -->
+        <div class="grid md:grid-cols-3 gap-4 mb-6">
+            <div id="systemStatus" class="bg-white rounded-lg shadow p-4 text-center">
+                <i class="fas fa-circle text-gray-400 text-2xl mb-2"></i>
+                <h3 class="font-semibold">System Status</h3>
+                <p class="text-sm text-gray-600">Checking...</p>
+            </div>
+            <div id="firebaseStatus" class="bg-white rounded-lg shadow p-4 text-center">
+                <i class="fas fa-circle text-gray-400 text-2xl mb-2"></i>
+                <h3 class="font-semibold">Firebase</h3>
+                <p class="text-sm text-gray-600">Checking...</p>
+            </div>
+            <div id="mapStatus" class="bg-white rounded-lg shadow p-4 text-center">
+                <i class="fas fa-circle text-gray-400 text-2xl mb-2"></i>
+                <h3 class="font-semibold">Map System</h3>
+                <p class="text-sm text-gray-600">Checking...</p>
+            </div>
+        </div>
+
+        <!-- Detailed Diagnostics -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-list-check text-green-600 mr-2"></i>
+                Component Status
+            </h2>
+            <div id="diagnosticsList" class="space-y-3">
+                <!-- Diagnostics will be populated here -->
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-tools text-blue-600 mr-2"></i>
+                Quick Actions
+            </h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <button onclick="runFullDiagnostics()" class="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-play mr-2"></i> Run Full Diagnostics
+                </button>
+                <button onclick="testFirebaseConnection()" class="bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-wifi mr-2"></i> Test Firebase Connection
+                </button>
+                <button onclick="clearCache()" class="bg-yellow-600 text-white p-3 rounded-lg hover:bg-yellow-700 transition">
+                    <i class="fas fa-broom mr-2"></i> Clear Cache
+                </button>
+                <button onclick="openDriverApp()" class="bg-purple-600 text-white p-3 rounded-lg hover:bg-purple-700 transition">
+                    <i class="fas fa-external-link-alt mr-2"></i> Test Driver App
+                </button>
+            </div>
+        </div>
+
+        <!-- Console Output -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-terminal text-gray-600 mr-2"></i>
+                Diagnostic Output
+            </h2>
+            <div id="diagnosticOutput" class="bg-gray-900 text-green-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
+                <div class="text-blue-400">[SYSTEM] Diagnostic tool initialized</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="../JS/config.js"></script>
+    <script src="../JS/common.js"></script>
+    
+    <script>
+        let diagnosticsStarted = false;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('diagnosticOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: 'text-green-400',
+                error: 'text-red-400',
+                warning: 'text-yellow-400',
+                success: 'text-blue-400',
+                system: 'text-purple-400'
+            };
+            
+            const entry = document.createElement('div');
+            entry.className = colors[type] || colors.info;
+            entry.textContent = `[${timestamp}] ${message}`;
+            
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            const icon = element.querySelector('i');
+            const text = element.querySelector('p');
+            
+            const statusConfig = {
+                success: { color: 'text-green-500', icon: 'fa-check-circle' },
+                error: { color: 'text-red-500', icon: 'fa-times-circle' },
+                warning: { color: 'text-yellow-500', icon: 'fa-exclamation-circle' },
+                loading: { color: 'text-blue-500', icon: 'fa-spinner fa-spin' }
+            };
+            
+            const config = statusConfig[status] || statusConfig.loading;
+            icon.className = `fas ${config.icon} ${config.color} text-2xl mb-2`;
+            text.textContent = message;
+        }
+
+        function addDiagnostic(name, status, details) {
+            const list = document.getElementById('diagnosticsList');
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-3 rounded-lg bg-gray-50';
+            
+            const statusColors = {
+                pass: 'text-green-600',
+                fail: 'text-red-600',
+                warning: 'text-yellow-600'
+            };
+            
+            const statusIcons = {
+                pass: 'fa-check-circle',
+                fail: 'fa-times-circle',
+                warning: 'fa-exclamation-triangle'
+            };
+            
+            item.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${statusIcons[status]} ${statusColors[status]} mr-3"></i>
+                    <div>
+                        <h4 class="font-medium">${name}</h4>
+                        <p class="text-sm text-gray-600">${details}</p>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold px-2 py-1 rounded ${status === 'pass' ? 'bg-green-100 text-green-800' : status === 'fail' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">${status.toUpperCase()}</span>
+            `;
+            
+            list.appendChild(item);
+        }
+
+        function checkComponent(name, checkFn, required = true) {
+            try {
+                const result = checkFn();
+                if (result) {
+                    addDiagnostic(name, 'pass', 'Component loaded and functional');
+                    log(`✓ ${name}: OK`, 'success');
+                    return true;
+                } else {
+                    addDiagnostic(name, required ? 'fail' : 'warning', required ? 'Required component missing' : 'Optional component missing');
+                    log(`${required ? '✗' : '⚠'} ${name}: ${required ? 'MISSING' : 'NOT AVAILABLE'}`, required ? 'error' : 'warning');
+                    return false;
+                }
+            } catch (error) {
+                addDiagnostic(name, 'fail', `Error: ${error.message}`);
+                log(`✗ ${name}: ERROR - ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runFullDiagnostics() {
+            if (diagnosticsStarted) return;
+            diagnosticsStarted = true;
+
+            log('Starting full system diagnostics...', 'system');
+            document.getElementById('diagnosticsList').innerHTML = '';
+
+            updateStatus('systemStatus', 'loading', 'Running diagnostics...');
+            updateStatus('firebaseStatus', 'loading', 'Checking Firebase...');
+            updateStatus('mapStatus', 'loading', 'Checking map system...');
+
+            // Check core libraries
+            const leafletOk = checkComponent('Leaflet Maps', () => typeof L !== 'undefined');
+            const firebaseOk = checkComponent('Firebase SDK', () => typeof firebase !== 'undefined');
+            const configOk = checkComponent('PTT Configuration', () => typeof PTTConfig !== 'undefined');
+            const commonUtilsOk = checkComponent('Common Utilities', () => typeof CommonUtils !== 'undefined', false);
+
+            // Check Firebase components
+            let databaseOk = false;
+            let authOk = false;
+            
+            if (firebaseOk) {
+                databaseOk = checkComponent('Firebase Database', () => window.database !== null && window.database !== undefined);
+                authOk = checkComponent('Firebase Auth', () => window.auth !== null && window.auth !== undefined, false);
+            }
+
+            // Test Firebase connection
+            if (databaseOk) {
+                try {
+                    log('Testing Firebase connection...', 'info');
+                    const connected = await PTTConfig.checkConnection();
+                    addDiagnostic('Firebase Connection', 'pass', 'Successfully connected to Firebase Realtime Database');
+                    log('✓ Firebase connection: ACTIVE', 'success');
+                } catch (error) {
+                    addDiagnostic('Firebase Connection', 'fail', `Connection failed: ${error.message}`);
+                    log(`✗ Firebase connection: FAILED - ${error.message}`, 'error');
+                }
+            }
+
+            // Update status indicators
+            const systemHealth = leafletOk && configOk;
+            const firebaseHealth = firebaseOk && databaseOk;
+            const mapHealth = leafletOk;
+
+            updateStatus('systemStatus', systemHealth ? 'success' : 'error', systemHealth ? 'All systems operational' : 'System issues detected');
+            updateStatus('firebaseStatus', firebaseHealth ? 'success' : 'error', firebaseHealth ? 'Firebase connected' : 'Firebase issues detected');
+            updateStatus('mapStatus', mapHealth ? 'success' : 'error', mapHealth ? 'Map system ready' : 'Map system issues');
+
+            log('Diagnostics completed', 'system');
+        }
+
+        async function testFirebaseConnection() {
+            log('Testing Firebase connection...', 'info');
+            
+            if (!window.database) {
+                log('✗ Database not initialized', 'error');
+                return;
+            }
+
+            try {
+                const result = await PTTConfig.checkConnection();
+                log('✓ Firebase connection test passed', 'success');
+            } catch (error) {
+                log(`✗ Firebase connection test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function clearCache() {
+            log('Clearing browser cache...', 'info');
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                log('✓ Cache cleared successfully', 'success');
+            } catch (error) {
+                log(`✗ Failed to clear cache: ${error.message}`, 'error');
+            }
+        }
+
+        function openDriverApp() {
+            log('Opening driver app for testing...', 'info');
+            window.open('driver-app.html', '_blank');
+        }
+
+        // Auto-run diagnostics on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                runFullDiagnostics();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Punjab Transport</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Maps JavaScript API -->
+    <!-- Replace YOUR_GOOGLE_MAPS_API_KEY with your actual API key -->
+    <script async defer 
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC0p0-2n_otSc39b2N4LeennvO7DZ5mXbA&libraries=geometry,places,visualization&callback=initGoogleMaps">
+    </script>
+    
+    <!-- MapmyIndia (Mappls) SDK - Currently disabled until API key is configured -->
+    <!-- Uncomment and add your API key when ready: -->
+    <!-- <script src="https://apis.mappls.com/advancedmaps/api/YOUR-API-KEY/map_sdk?layer=vector&v=3.0&callback=initializeAdminMap"></script> -->
+    
+    <!-- Leaflet as fallback when Google Maps is not available -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stat-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .bus-marker-admin {
+            background: #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .alert-marker {
+            background: #ef4444;
+            animation: pulse-alert 2s infinite;
+        }
+        @keyframes pulse-alert {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        /* Route Management Styles */
+        .route-stop-marker {
+            background: #ef4444;
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .modal-overlay {
+            backdrop-filter: blur(2px);
+        }
+        
+        .route-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .route-table th,
+        .route-table td {
+            border: 1px solid #e5e7eb;
+            border-right: 0;
+            border-bottom: 0;
+        }
+        
+        .route-table th:last-child,
+        .route-table td:last-child {
+            border-right: 1px solid #e5e7eb;
+        }
+        
+        .route-table tr:last-child td {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .leaflet-container {
+            border-radius: 8px;
+        }
+        
+        /* Modal overlay styles */
+        .modal-backdrop {
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+        
+        /* Ensure modals are above everything */
+        .modal-overlay {
+            z-index: 9999 !important;
+        }
+        
+        /* Hide content behind modal */
+        .modal-open {
+            overflow: hidden;
+        }
+        
+        .modal-open .leaflet-container {
+            pointer-events: none;
+        }
+        
+        /* Route creation map styles */
+        .route-instruction-popup .leaflet-popup-content-wrapper {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3);
+        }
+        
+        .route-instruction-popup .leaflet-popup-tip {
+            background: #10b981;
+        }
+        
+        /* Map container when ready */
+        .map-ready {
+            border: 3px solid #10b981 !important;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .map-ready:hover {
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <nav class="bg-blue-600 text-white p-4 shadow-lg fixed w-full top-0 z-40">
+        <div class="max-w-full mx-auto flex items-center justify-between px-4">
+            <h1 class="text-xl md:text-2xl font-bold flex items-center">
+                <i class="fas fa-cog mr-2"></i> Admin Dashboard
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span id="adminName" class="hidden md:block"></span>
+                <button onclick="refreshData()" class="bg-blue-500 px-3 py-1 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button onclick="logout()" class="bg-red-500 px-3 py-1 md:px-4 md:py-2 rounded-lg hover:bg-red-600 transition text-sm md:text-base">
+                    <i class="fas fa-sign-out-alt mr-1 md:mr-2"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="flex items-center justify-center min-h-screen px-4 pt-16">
+        <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg">
+            <div class="text-center mb-6">
+                <i class="fas fa-user-shield text-6xl text-blue-600 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Admin Login</h2>
+                <p class="text-gray-600 mt-2">Punjab Transport System</p>
+            </div>
+            
+            <form onsubmit="adminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        <i class="fas fa-envelope mr-1"></i> Email
+                    </label>
+                    <input type="email" id="adminEmail" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="admin@punjabtransport.gov.in" required>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        <i class="fas fa-lock mr-1"></i> Password
+                    </label>
+                    <input type="password" id="adminPassword" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Login
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm text-gray-600">
+                <p>Demo Credentials:</p>
+                <p class="mt-1">Email: admin@demo.com | Pass: admin123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="hidden pt-16 pb-4">
+        <!-- Statistics Cards -->
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">System Overview</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Active Buses Card -->
+                <div class="stat-card bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100">Active Buses</p>
+                            <p class="text-3xl font-bold" id="activeBusCount">0</p>
+                            <p class="text-sm text-blue-100 mt-1">Currently running</p>
+                        </div>
+                        <div class="text-4xl opacity-50">
+                            <i class="fas fa-bus"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Drivers Card -->
+                <div class="stat-card bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100">Active Drivers</p>
+                            <p class="text-3xl font-bold" id="activeDriverCount">0</p>
+                            <p class="text-sm text-green-100 mt-1">On duty</p>
+                        </div>
+                        <div class="text-4xl opacity-50">
+                            <i class="fas fa-id-card"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Routes Card -->
+                <div class="stat-card bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100">Total Routes</p>
+                            <p class="text-3xl font-bold" id="totalRouteCount">24</p>
+                            <p class="text-sm text-purple-100 mt-1">Across Punjab</p>
+                        </div>
+                        <div class="text-4xl opacity-50">
+                            <i class="fas fa-route"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts Card -->
+                <div class="stat-card bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-lg shadow-lg cursor-pointer" onclick="showAlerts()">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-100">Active Alerts</p>
+                            <p class="text-3xl font-bold" id="alertCount">0</p>
+                            <p class="text-sm text-red-100 mt-1">Require attention</p>
+                        </div>
+                        <div class="text-4xl opacity-50">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Column - Controls -->
+                <div class="space-y-6">
+                    <!-- City Filter -->
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-filter mr-2"></i> Filter Controls
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-sm text-gray-600 mb-1 block">Select City</label>
+                                <select id="cityFilter" onchange="filterByCity()" class="w-full p-3 border rounded-lg">
+                                    <option value="all">All Cities</option>
+                                    <option value="chandigarh">Chandigarh</option>
+                                    <option value="ludhiana">Ludhiana</option>
+                                    <option value="amritsar">Amritsar</option>
+                                    <option value="jalandhar">Jalandhar</option>
+                                    <option value="patiala">Patiala</option>
+                                    <option value="bathinda">Bathinda</option>
+                                    <option value="mohali">Mohali</option>
+                                    <option value="pathankot">Pathankot</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="text-sm text-gray-600 mb-1 block">Status Filter</label>
+                                <select id="statusFilter" onchange="filterByStatus()" class="w-full p-3 border rounded-lg">
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active Only</option>
+                                    <option value="inactive">Inactive Only</option>
+                                    <option value="emergency">Emergency</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Buses List -->
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-bus mr-2"></i> Active Buses
+                        </h3>
+                        <div id="activeBusesList" class="space-y-3 max-h-96 overflow-y-auto">
+                            <!-- Bus list will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Route Management -->
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-route mr-2"></i> Route Management
+                        </h3>
+                        <div class="space-y-3">
+                            <button onclick="showCreateRouteModal()" class="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition font-semibold">
+                                <i class="fas fa-plus mr-2"></i> Create New Route
+                            </button>
+                            <button onclick="showManageRoutesModal()" class="w-full bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 transition font-semibold">
+                                <i class="fas fa-edit mr-2"></i> Manage Routes
+                            </button>
+                            <button onclick="showRouteAnalytics()" class="w-full bg-purple-500 text-white p-3 rounded-lg hover:bg-purple-600 transition font-semibold">
+                                <i class="fas fa-chart-bar mr-2"></i> Route Analytics
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- System Health -->
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-heartbeat mr-2"></i> System Health
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">GPS Tracking</span>
+                                <span class="flex items-center text-green-600">
+                                    <i class="fas fa-circle text-xs mr-1"></i> Operational
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">Database</span>
+                                <span class="flex items-center text-green-600">
+                                    <i class="fas fa-circle text-xs mr-1"></i> Connected
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">API Status</span>
+                                <span class="flex items-center text-green-600">
+                                    <i class="fas fa-circle text-xs mr-1"></i> Active
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Column - Map -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Map Container -->
+                    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                        <div class="p-4 border-b flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-map mr-2"></i> Live Bus Tracking
+                            </h3>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="showAllBuses()" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition">
+                                    <i class="fas fa-expand"></i> Show All
+                                </button>
+                                <button onclick="toggleHeatmap()" class="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 transition">
+                                    <i class="fas fa-fire"></i> Heatmap
+                                </button>
+                            </div>
+                        </div>
+                        <div id="adminMap" class="h-96"></div>
+                    </div>
+
+                    <!-- Statistics Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Bus Activity Chart -->
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                                <i class="fas fa-chart-line mr-2"></i> Bus Activity (24h)
+                            </h3>
+                            <canvas id="activityChart" width="400" height="200"></canvas>
+                        </div>
+
+                        <!-- Route Usage Chart -->
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                                <i class="fas fa-chart-pie mr-2"></i> Route Usage
+                            </h3>
+                            <canvas id="routeChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Creation Modal -->
+    <div id="createRouteModal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[9999] flex items-center justify-center p-4" style="backdrop-filter: blur(4px);">
+        <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col relative z-[10000]">
+            <div class="p-4 border-b flex-shrink-0 bg-blue-50">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-plus-circle mr-2 text-blue-500"></i> Create New City Bus Route
+                    </h2>
+                    <button onclick="closeCreateRouteModal()" class="text-gray-500 hover:text-gray-700 text-xl p-2 hover:bg-gray-100 rounded">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4">
+                <form id="routeCreationForm" class="space-y-4">
+                    <!-- Route Basic Info -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-3 text-gray-800">Basic Route Information</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Route Number *</label>
+                                <input type="text" id="routeNumber" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                       placeholder="e.g., CH-001, LD-042" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Route Name *</label>
+                                <input type="text" id="routeName" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                       placeholder="e.g., Sector 17 to Railway Station" required>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">City *</label>
+                                <select id="routeCity" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required onchange="updateMapToCity()">
+                                    <option value="">Select City</option>
+                                    <option value="chandigarh">Chandigarh</option>
+                                    <option value="ludhiana">Ludhiana</option>
+                                    <option value="amritsar">Amritsar</option>
+                                    <option value="jalandhar">Jalandhar</option>
+                                    <option value="patiala">Patiala</option>
+                                    <option value="bathinda">Bathinda</option>
+                                    <option value="mohali">Mohali</option>
+                                    <option value="pathankot">Pathankot</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Route Type *</label>
+                                <select id="routeType" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                                    <option value="">Select Route Type</option>
+                                    <option value="circular">Circular Route</option>
+                                    <option value="linear">Linear Route (Point A to Point B)</option>
+                                    <option value="express">Express Route</option>
+                                    <option value="local">Local Route</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Route Description</label>
+                            <textarea id="routeDescription" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                      rows="2" placeholder="Describe the route coverage area, major landmarks served, etc."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Route Stops Section -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-map-pin mr-2"></i> Route Stops
+                            </h3>
+                            <button type="button" onclick="addRouteStop()" class="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition text-sm">
+                                <i class="fas fa-plus mr-1"></i> Add Stop
+                            </button>
+                        </div>
+                        <div id="routeStopsList" class="space-y-2 max-h-40 overflow-y-auto">
+                            <p class="text-gray-500 text-sm">Click "Add Stop" or click on the map below to add bus stops</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Interactive Map -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-map mr-2"></i> Route Map
+                                <span class="text-sm text-gray-600 font-normal ml-2">(Click on map to add stops)</span>
+                            </h3>
+                            <div class="flex space-x-2">
+                                <button type="button" onclick="testMapClick()" class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition">
+                                    <i class="fas fa-mouse-pointer mr-1"></i> Test Click
+                                </button>
+                                <button type="button" onclick="clearRouteData()" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">
+                                    <i class="fas fa-trash mr-1"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div id="routeCreationMap" class="h-64 border rounded-lg bg-gray-200"></div>
+                        <div class="mt-2 text-xs text-gray-600">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Select a city above to center the map, then click anywhere to add bus stops
+                        </div>
+                    </div>
+                    
+                    <!-- Schedule Settings -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">
+                            <i class="fas fa-clock mr-2"></i> Schedule Settings
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">First Bus Time</label>
+                                <input type="time" id="firstBusTime" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500" value="06:00">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Last Bus Time</label>
+                                <input type="time" id="lastBusTime" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500" value="22:00">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Frequency (minutes)</label>
+                                <input type="number" id="busFrequency" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                       placeholder="30" min="5" max="120" value="30">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end space-x-3 p-4 border-t bg-gray-50 flex-shrink-0">
+                <button type="button" onclick="closeCreateRouteModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
+                    Cancel
+                </button>
+                <button type="button" onclick="createNewRoute()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition text-sm">
+                    <i class="fas fa-save mr-2"></i> Create Route
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Management Modal -->
+    <div id="manageRoutesModal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col relative z-[61]">
+            <div class="p-6 border-b flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-edit mr-2 text-green-500"></i> Manage Routes
+                    </h2>
+                    <button onclick="closeManageRoutesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-hidden flex flex-col p-6">
+                <!-- Search and Filter -->
+                <div class="mb-6 flex items-center space-x-4 flex-shrink-0">
+                    <div class="flex-1">
+                        <input type="text" id="routeSearchInput" placeholder="Search routes..." 
+                               class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                               oninput="searchRoutes()">
+                    </div>
+                    <select id="routeStatusFilter" class="p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" onchange="filterRoutes()">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="maintenance">Under Maintenance</option>
+                    </select>
+                </div>
+                
+                <!-- Routes Table -->
+                <div class="flex-1 overflow-auto">
+                    <table class="w-full route-table">
+                        <thead class="sticky top-0 bg-white">
+                            <tr class="bg-gray-50">
+                                <th class="border border-gray-200 p-3 text-left">Route No.</th>
+                                <th class="border border-gray-200 p-3 text-left">Route Name</th>
+                                <th class="border border-gray-200 p-3 text-left">City</th>
+                                <th class="border border-gray-200 p-3 text-left">Type</th>
+                                <th class="border border-gray-200 p-3 text-left">Stops</th>
+                                <th class="border border-gray-200 p-3 text-left">Status</th>
+                                <th class="border border-gray-200 p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="routesTableBody">
+                            <!-- Routes will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Edit Modal -->
+    <div id="editRouteModal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col relative z-[61]">
+            <div class="p-6 border-b flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-edit mr-2 text-orange-500"></i> Edit Route
+                    </h2>
+                    <button onclick="closeEditRouteModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6">
+                <form id="routeEditForm" class="space-y-6">
+                    <input type="hidden" id="editRouteId">
+                    
+                    <!-- Similar form structure as create route -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Route Number</label>
+                            <input type="text" id="editRouteNumber" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Route Name</label>
+                            <input type="text" id="editRouteName" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
+                            <select id="editRouteCity" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required onchange="updateEditMapToCity()">
+                                <option value="chandigarh">Chandigarh</option>
+                                <option value="ludhiana">Ludhiana</option>
+                                <option value="amritsar">Amritsar</option>
+                                <option value="jalandhar">Jalandhar</option>
+                                <option value="patiala">Patiala</option>
+                                <option value="bathinda">Bathinda</option>
+                                <option value="mohali">Mohali</option>
+                                <option value="pathankot">Pathankot</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Route Type</label>
+                            <select id="editRouteType" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                                <option value="circular">Circular Route</option>
+                                <option value="linear">Linear Route (Point A to Point B)</option>
+                                <option value="express">Express Route</option>
+                                <option value="local">Local Route</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Route Status</label>
+                        <select id="editRouteStatus" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="maintenance">Under Maintenance</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Route Description</label>
+                        <textarea id="editRouteDescription" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500" rows="3"></textarea>
+                    </div>
+                    
+                    <!-- Edit Map -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-map mr-2"></i> Route Map
+                        </h3>
+                        <div id="routeEditMap" class="h-80 border rounded-lg"></div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end space-x-4 p-6 border-t bg-gray-50 flex-shrink-0">
+                <button type="button" onclick="closeEditRouteModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" onclick="updateRoute()" class="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition">
+                    <i class="fas fa-save mr-2"></i> Update Route
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load Scripts -->
+    <script src="../JS/config.js"></script>
+    <script src="../JS/common.js"></script>
+    <script src="../JS/admin.js"></script>
+</body>
+</html>

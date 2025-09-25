@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Setup - Punjab Transport Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-database text-blue-600 mr-2"></i>
+                    Firebase Database Setup
+                </h1>
+                <p class="text-gray-600">Initialize your Punjab Transport Tracker Firebase database</p>
+            </div>
+
+            <!-- Connection Status -->
+            <div id="connectionStatus" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-plug text-green-600 mr-2"></i>
+                    Connection Status
+                </h2>
+                <div id="statusContent" class="flex items-center">
+                    <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                    <span>Testing connection...</span>
+                </div>
+            </div>
+
+            <!-- Setup Actions -->
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Database Operations -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">
+                        <i class="fas fa-cogs text-blue-600 mr-2"></i>
+                        Database Operations
+                    </h2>
+                    <div class="space-y-3">
+                        <button onclick="testConnection()" class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition">
+                            <i class="fas fa-wifi mr-2"></i> Test Connection
+                        </button>
+                        <button onclick="initializeDatabase()" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-database mr-2"></i> Initialize Database
+                        </button>
+                        <button onclick="addSampleData()" class="w-full bg-purple-600 text-white p-3 rounded-lg hover:bg-purple-700 transition">
+                            <i class="fas fa-plus-circle mr-2"></i> Add Sample Data
+                        </button>
+                        <button onclick="showSecurityRules()" class="w-full bg-yellow-600 text-white p-3 rounded-lg hover:bg-yellow-700 transition">
+                            <i class="fas fa-shield-alt mr-2"></i> Show Security Rules
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dangerous Operations -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-red-600">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Dangerous Operations
+                    </h2>
+                    <div class="space-y-3">
+                        <button onclick="clearDatabase()" class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-trash mr-2"></i> Clear All Data
+                        </button>
+                        <p class="text-sm text-red-600">
+                            <i class="fas fa-warning mr-1"></i>
+                            This will permanently delete all data!
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Output -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-terminal text-gray-600 mr-2"></i>
+                    Console Output
+                </h2>
+                <div id="logOutput" class="bg-gray-900 text-green-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
+                    <div class="log-entry">Firebase Setup Tool loaded...</div>
+                </div>
+            </div>
+
+            <!-- Security Rules Modal -->
+            <div id="rulesModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div class="bg-gray-100 px-6 py-4 border-b flex items-center justify-between">
+                        <h3 class="text-xl font-semibold">Firebase Security Rules</h3>
+                        <button onclick="hideSecurityRules()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <div class="p-6 overflow-y-auto max-h-[70vh]">
+                        <p class="mb-4 text-gray-600">Copy the following rules to your Firebase Console > Database > Rules:</p>
+                        <pre id="rulesContent" class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm"></pre>
+                    </div>
+                    <div class="bg-gray-100 px-6 py-4 border-t flex justify-end">
+                        <button onclick="copyRules()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2">
+                            <i class="fas fa-copy mr-1"></i> Copy Rules
+                        </button>
+                        <button onclick="hideSecurityRules()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Scripts -->
+    <script src="../JS/config.js"></script>
+    <script src="../JS/firebase-init.js"></script>
+    
+    <script>
+        // UI Helper functions
+        function log(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: 'text-green-400',
+                error: 'text-red-400',
+                warning: 'text-yellow-400',
+                success: 'text-blue-400'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${colors[type] || colors.info}`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            
+            logOutput.appendChild(logEntry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        function updateConnectionStatus(connected, message) {
+            const statusContent = document.getElementById('statusContent');
+            if (connected) {
+                statusContent.innerHTML = `
+                    <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                    <span class="text-green-600 font-semibold">Connected - ${message}</span>
+                `;
+            } else {
+                statusContent.innerHTML = `
+                    <i class="fas fa-times-circle text-red-600 mr-2"></i>
+                    <span class="text-red-600 font-semibold">Disconnected - ${message}</span>
+                `;
+            }
+        }
+
+        // Button handlers
+        async function testConnection() {
+            log('Testing Firebase connection...', 'info');
+            try {
+                const connected = await FirebaseInit.testConnection();
+                if (connected) {
+                    log('✅ Connection test passed!', 'success');
+                    updateConnectionStatus(true, 'Database accessible');
+                } else {
+                    log('❌ Connection test failed!', 'error');
+                    updateConnectionStatus(false, 'Cannot connect to database');
+                }
+            } catch (error) {
+                log(`❌ Connection error: ${error.message}`, 'error');
+                updateConnectionStatus(false, error.message);
+            }
+        }
+
+        async function initializeDatabase() {
+            log('Initializing Firebase database structure...', 'info');
+            try {
+                await FirebaseInit.initializeDatabase();
+                log('✅ Database initialized successfully!', 'success');
+            } catch (error) {
+                log(`❌ Initialization failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function addSampleData() {
+            log('Adding sample live data...', 'info');
+            try {
+                await FirebaseInit.addSampleLiveData();
+                log('✅ Sample data added successfully!', 'success');
+            } catch (error) {
+                log(`❌ Failed to add sample data: ${error.message}`, 'error');
+            }
+        }
+
+        function showSecurityRules() {
+            const rules = {
+                "rules": {
+                    ".read": "auth != null",
+                    ".write": "auth != null",
+                    "live_buses": {
+                        "$routeId": {
+                            "$driverId": {
+                                ".write": "auth != null",
+                                ".read": true
+                            }
+                        }
+                    },
+                    "alerts": {
+                        ".write": "auth != null",
+                        ".read": "auth != null"
+                    },
+                    "drivers": {
+                        "$driverId": {
+                            ".write": "auth != null",
+                            ".read": "auth != null"
+                        }
+                    }
+                }
+            };
+
+            document.getElementById('rulesContent').textContent = JSON.stringify(rules, null, 2);
+            document.getElementById('rulesModal').classList.remove('hidden');
+        }
+
+        function hideSecurityRules() {
+            document.getElementById('rulesModal').classList.add('hidden');
+        }
+
+        function copyRules() {
+            const rulesText = document.getElementById('rulesContent').textContent;
+            navigator.clipboard.writeText(rulesText).then(() => {
+                log('✅ Security rules copied to clipboard!', 'success');
+            }).catch(() => {
+                log('❌ Failed to copy rules to clipboard', 'error');
+            });
+        }
+
+        async function clearDatabase() {
+            try {
+                await FirebaseInit.clearDatabase();
+                log('✅ Database cleared successfully!', 'success');
+            } catch (error) {
+                log(`❌ Failed to clear database: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-test connection on page load
+        window.addEventListener('load', () => {
+            setTimeout(testConnection, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard - Punjab Transport</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <style>
+        .driver-marker {
+            background: #10b981;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .driver-marker::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #10b981;
+        }
+        
+        /* New marker styles */
+        .driver-marker-standby {
+            background: #6b7280;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            animation: pulse-standby 3s infinite;
+        }
+        
+        .driver-marker-active {
+            background: #10b981;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            position: relative;
+            animation: pulse-active 2s infinite;
+        }
+        
+        .driver-marker-active::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #10b981;
+        }
+        
+        @keyframes pulse-standby {
+            0% { box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(107, 114, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(107, 114, 128, 0); }
+        }
+        
+        @keyframes pulse-active {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        .tracking-active {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        /* Ensure map container has proper dimensions */
+        #driverMap {
+            height: 100%;
+            min-height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Header -->
+    <div class="bg-green-600 text-white p-4 shadow-lg fixed w-full top-0 z-40">
+        <div class="max-w-full mx-auto flex items-center justify-between px-4">
+            <h1 class="text-xl md:text-2xl font-bold flex items-center">
+                <i class="fas fa-id-badge mr-2"></i> Driver Dashboard
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span id="driverName" class="hidden md:block"></span>
+                <button onclick="logout()" class="bg-red-500 px-3 py-1 md:px-4 md:py-2 rounded-lg hover:bg-red-600 transition text-sm md:text-base">
+                    <i class="fas fa-sign-out-alt mr-1 md:mr-2"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="flex items-center justify-center min-h-screen px-4 pt-16">
+        <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg">
+            <div class="text-center mb-6">
+                <i class="fas fa-bus text-6xl text-green-600 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Driver Login</h2>
+                <p class="text-gray-600 mt-2">Punjab Transport System</p>
+            </div>
+            
+            <form onsubmit="driverLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        <i class="fas fa-phone mr-1"></i> Phone Number
+                    </label>
+                    <input type="tel" id="phoneNumber" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                           placeholder="+91XXXXXXXXXX" required pattern="^\+91[0-9]{10}$">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                        <i class="fas fa-id-card mr-1"></i> Driver ID
+                    </label>
+                    <input type="text" id="driverId" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                           placeholder="Enter your driver ID" required>
+                </div>
+                
+                <button type="submit" class="w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 transition font-semibold">
+                    <i class="fas fa-sign-in-alt mr-2"></i> Login
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center text-sm text-gray-600">
+                <p>Demo Credentials:</p>
+                <p class="mt-1">Phone: +919876543210 | ID: DR001</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver Dashboard -->
+    <div id="driverDashboard" class="hidden pt-16">
+        <div class="flex flex-col lg:flex-row h-screen">
+            <!-- Control Panel -->
+            <div class="w-full lg:w-96 bg-white shadow-lg overflow-y-auto">
+                <div class="p-4 space-y-4">
+                    <!-- Driver Info Card -->
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-3">Driver Information</h3>
+                        <div id="driverInfo" class="space-y-2">
+                            <!-- Driver info will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Bus Assignment Card -->
+                    <div class="bg-white border border-gray-200 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-bus mr-2"></i> Bus Assignment
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-sm text-gray-600 mb-1 block">Select City</label>
+                                <select id="busCity" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500">
+                                    <option value="">Choose city...</option>
+                                    <option value="chandigarh">Chandigarh</option>
+                                    <option value="ludhiana">Ludhiana</option>
+                                    <option value="amritsar">Amritsar</option>
+                                    <option value="jalandhar">Jalandhar</option>
+                                    <option value="patiala">Patiala</option>
+                                    <option value="bathinda">Bathinda</option>
+                                    <option value="mohali">Mohali</option>
+                                    <option value="pathankot">Pathankot</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="text-sm text-gray-600 mb-1 block">Bus Number</label>
+                                <input type="text" id="busNumber" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" 
+                                       placeholder="e.g., PB-01-1234">
+                            </div>
+                            
+                            <div>
+                                <label class="text-sm text-gray-600 mb-1 block">Select Route</label>
+                                <select id="busRoute" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" disabled>
+                                    <option value="">Choose route...</option>
+                                </select>
+                            </div>
+                            
+                            <button onclick="saveBusAssignment()" class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-2"></i> Save Assignment
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tracking Control Card -->
+                    <div class="bg-white border border-gray-200 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-satellite-dish mr-2"></i> GPS Tracking
+                        </h3>
+                        
+                        <button id="trackingBtn" onclick="toggleTracking()" class="w-full bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition text-lg font-semibold mb-4" disabled>
+                            <i class="fas fa-play mr-2"></i> Start Tracking
+                        </button>
+                        
+                        <div id="trackingStatus" class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center justify-center space-x-2">
+                                <div id="statusDot" class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span class="text-gray-700">Status: <span id="statusText" class="font-semibold text-red-600">Inactive</span></span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-2">Please assign bus details first</p>
+                        </div>
+                    </div>
+
+                    <!-- Trip Statistics Card -->
+                    <div class="bg-white border border-gray-200 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-chart-line mr-2"></i> Trip Statistics
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-route mr-1"></i> Distance
+                                </span>
+                                <span id="tripDistance" class="font-semibold text-lg">0.0 km</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-clock mr-1"></i> Duration
+                                </span>
+                                <span id="tripDuration" class="font-semibold text-lg">00:00</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-tachometer-alt mr-1"></i> Current Speed
+                                </span>
+                                <span id="currentSpeed" class="font-semibold text-lg text-green-600">0 km/h</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-chart-bar mr-1"></i> Avg Speed
+                                </span>
+                                <span id="avgSpeed" class="font-semibold text-lg">0 km/h</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-users mr-1"></i> Passengers
+                                </span>
+                                <input type="number" id="passengerCount" class="w-20 p-1 border rounded text-center" 
+                                       value="0" min="0" max="60" onchange="updatePassengerCount()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="space-y-2">
+                        <button onclick="sendAlert('break')" class="w-full bg-yellow-500 text-white p-3 rounded-lg hover:bg-yellow-600 transition">
+                            <i class="fas fa-coffee mr-2"></i> Break Time
+                        </button>
+                        <button onclick="sendAlert('traffic')" class="w-full bg-orange-500 text-white p-3 rounded-lg hover:bg-orange-600 transition">
+                            <i class="fas fa-traffic-light mr-2"></i> Heavy Traffic
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map View -->
+            <div class="flex-1 relative">
+                <div id="driverMap" class="w-full h-full"></div>
+                
+                <!-- Map Controls -->
+                <div class="absolute bottom-4 right-4 space-y-2 z-20">
+                    <button onclick="centerOnDriver()" class="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-100 transition" title="Center on my location">
+                        <i class="fas fa-crosshairs text-gray-600"></i>
+                    </button>
+                    <button onclick="toggleMapView()" class="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-100 transition" title="Toggle view">
+                        <i class="fas fa-layer-group text-gray-600"></i>
+                    </button>
+                </div>
+
+                <!-- Speed Display -->
+                <div class="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-20">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-green-600" id="speedDisplay">0</div>
+                        <div class="text-sm text-gray-600">km/h</div>
+                    </div>
+                </div>
+
+                <!-- GPS Accuracy -->
+                <div class="absolute top-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 z-20">
+                    <div class="flex items-center space-x-2">
+                        <i id="gpsStatusIcon" class="fas fa-satellite text-gray-400"></i>
+                        <div>
+                            <span class="text-sm">GPS: <span id="gpsAccuracy">--</span>m</span>
+                            <div class="text-xs text-gray-500" id="gpsStatus">Initializing...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emergency Button -->
+        <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 lg:bottom-8 lg:right-8 lg:left-auto lg:transform-none z-30">
+            <button onclick="sendEmergencyAlert()" class="bg-red-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-red-700 transition text-lg font-semibold">
+                <i class="fas fa-exclamation-triangle mr-2"></i> Emergency
+            </button>
+        </div>
+    </div>
+    
+    <!-- Load Scripts -->
+    <script src="../JS/config.js"></script>
+    <script src="../JS/common.js"></script>
+    <script src="../JS/driver-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Test - Punjab Transport Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        #testMap {
+            height: 400px;
+            width: 100%;
+            border: 2px solid #ccc;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Map Testing Tool</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Library Status</h2>
+            <div id="libraryStatus" class="space-y-2">
+                <!-- Status will be populated here -->
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Map</h2>
+            <div id="testMap"></div>
+            <div class="mt-4 flex space-x-2">
+                <button onclick="initializeTestMap()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Initialize Map
+                </button>
+                <button onclick="addTestMarker()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Add Marker
+                </button>
+                <button onclick="resizeMap()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                    Resize Map
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Console Output</h2>
+            <div id="console" class="bg-gray-900 text-green-400 p-4 rounded font-mono text-sm h-64 overflow-y-auto">
+                <!-- Console output will appear here -->
+            </div>
+        </div>
+    </div>
+    
+    <script src="../JS/config.js"></script>
+    <script>
+        let testMap = null;
+        let testMarker = null;
+        
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: 'text-green-400',
+                error: 'text-red-400',
+                success: 'text-blue-400',
+                warning: 'text-yellow-400'
+            };
+            
+            const entry = document.createElement('div');
+            entry.className = colors[type] || colors.info;
+            entry.textContent = `[${timestamp}] ${message}`;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+        }
+        
+        function checkLibraries() {
+            const status = document.getElementById('libraryStatus');
+            const checks = [
+                { name: 'Leaflet (L)', check: () => typeof L !== 'undefined', required: true },
+                { name: 'PTTConfig', check: () => typeof PTTConfig !== 'undefined', required: true },
+                { name: 'Firebase', check: () => typeof firebase !== 'undefined', required: false },
+                { name: 'CommonUtils', check: () => typeof CommonUtils !== 'undefined', required: false }
+            ];
+            
+            checks.forEach(check => {
+                const div = document.createElement('div');
+                const isLoaded = check.check();
+                div.className = `flex items-center space-x-2 ${isLoaded ? 'text-green-600' : 'text-red-600'}`;
+                div.innerHTML = `
+                    <i class="fas ${isLoaded ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+                    <span>${check.name}: ${isLoaded ? 'Loaded' : 'Not Loaded'}</span>
+                    ${check.required && !isLoaded ? '<span class="text-red-500 text-xs">(Required)</span>' : ''}
+                `;
+                status.appendChild(div);
+                
+                log(`${check.name}: ${isLoaded ? 'Loaded' : 'Not Loaded'}`, isLoaded ? 'success' : 'error');
+            });
+        }
+        
+        function initializeTestMap() {
+            try {
+                log('Attempting to initialize test map...');
+                
+                if (typeof L === 'undefined') {
+                    throw new Error('Leaflet library not found');
+                }
+                
+                if (typeof PTTConfig === 'undefined') {
+                    throw new Error('PTTConfig not found');
+                }
+                
+                const container = document.getElementById('testMap');
+                if (!container) {
+                    throw new Error('Map container not found');
+                }
+                
+                // Clear any existing map
+                if (testMap) {
+                    testMap.remove();
+                    testMap = null;
+                }
+                
+                // Force container dimensions
+                container.style.height = '400px';
+                container.style.width = '100%';
+                
+                log('Creating Leaflet map...');
+                testMap = L.map('testMap').setView([PTTConfig.app.map.defaultCenter.lat, PTTConfig.app.map.defaultCenter.lng], 10);
+                
+                log('Adding tile layer...');
+                L.tileLayer(PTTConfig.app.map.tileLayer, {
+                    attribution: PTTConfig.app.map.attribution,
+                    maxZoom: 18,
+                    minZoom: 6
+                }).addTo(testMap);
+                
+                // Force resize
+                setTimeout(() => {
+                    testMap.invalidateSize();
+                    log('Map initialized successfully!', 'success');
+                }, 250);
+                
+            } catch (error) {
+                log(`Error initializing map: ${error.message}`, 'error');
+                console.error('Map initialization error:', error);
+            }
+        }
+        
+        function addTestMarker() {
+            if (!testMap) {
+                log('Map not initialized. Please initialize first.', 'warning');
+                return;
+            }
+            
+            try {
+                const center = testMap.getCenter();
+                
+                if (testMarker) {
+                    testMap.removeLayer(testMarker);
+                }
+                
+                testMarker = L.marker([center.lat, center.lng]).addTo(testMap);
+                testMarker.bindPopup('Test Marker').openPopup();
+                
+                log(`Marker added at: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`, 'success');
+            } catch (error) {
+                log(`Error adding marker: ${error.message}`, 'error');
+            }
+        }
+        
+        function resizeMap() {
+            if (!testMap) {
+                log('Map not initialized. Please initialize first.', 'warning');
+                return;
+            }
+            
+            try {
+                testMap.invalidateSize();
+                log('Map resized successfully', 'success');
+            } catch (error) {
+                log(`Error resizing map: ${error.message}`, 'error');
+            }
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Map test tool loaded');
+            checkLibraries();
+        });
+    </script>
+</body>
+</html>
