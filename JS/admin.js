@@ -226,6 +226,18 @@ function initializeGoogleRouteCreationMap() {
         console.log('✅ Google Maps route creation initialized successfully');
         showNotification('Google Maps loaded successfully! Click to add stops.', 'success');
         
+        // If we have KML data loaded, display it on this map too
+        if (routeKmlData && routeKmlData.length > 0) {
+            console.log('📍 Displaying KML data on Google Maps route creation map...');
+            displayKMLRoutesOnRouteCreationMap(routeKmlData);
+        }
+        
+        // Check for modal KML data
+        if (window.modalKmlData && window.modalKmlData.length > 0) {
+            console.log('📍 Displaying modal KML data on Google Maps route creation map...');
+            displayKMLRoutesOnRouteCreationMap(window.modalKmlData);
+        }
+        
     } catch (error) {
         console.error('Error initializing Google Maps route creation:', error);
         console.log('Falling back to Leaflet for route creation');
@@ -374,6 +386,19 @@ function initializeFormHandlers() {
             }
         });
     }
+    
+    // Modal KML file upload handler
+    const modalKmlUpload = document.getElementById('modalKmlFileUpload');
+    if (modalKmlUpload) {
+        modalKmlUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && (file.name.endsWith('.kml') || file.name.endsWith('.kmz'))) {
+                loadKMLFileInModal(file);
+            } else {
+                showNotification('Please select a valid KML file', 'error');
+            }
+        });
+    }
 }
 
 // ===================================
@@ -386,6 +411,9 @@ function initializeFormHandlers() {
  */
 function loadKMLFile(file) {
     console.log('📄 Loading KML file:', file.name);
+    
+    // Store the current KML file name for reference
+    currentKmlFile = file.name;
     
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -628,7 +656,7 @@ function displayKMLRoutes(routes, fileName) {
     }
     
     // Update UI
-    updateKMLRoutesList(routes, fileName);
+    updateKMLRoutesDisplay(routes, fileName);
 }
 
 /**
@@ -825,74 +853,368 @@ function clearKMLLayer() {
     kmlLayer = null;
     routeKmlData = [];
     currentKmlFile = null;
+    
+    // Clear the UI display as well
+    updateKMLRoutesDisplay([]);
+    
+    showNotification('KML data cleared successfully', 'info');
 }
 
 /**
- * Update KML routes list in UI
- * @param {Array} routes - Array of route objects
- * @param {string} fileName - Name of the source KML file
+ * Display KML routes on the route creation map for reference
+ * @param {Array} routes - Array of KML route objects
  */
-function updateKMLRoutesList(routes, fileName) {
-    const container = document.getElementById('kmlRoutesContainer');
-    if (!container) return;
+function displayKMLRoutesOnRouteCreationMap(routes) {
+    if (!routeCreationMap || !routes || routes.length === 0) {
+        console.warn('Cannot display KML routes: map not initialized or no routes available');
+        return;
+    }
     
-    container.innerHTML = `
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-            <h4 class="text-green-800 font-semibold mb-2">📄 KML File Loaded</h4>
-            <p class="text-green-700 text-sm mb-2">
-                <strong>File:</strong> ${fileName}
-            </p>
-            <p class="text-green-700 text-sm mb-3">
-                <strong>Routes Found:</strong> ${routes.length}
-            </p>
-            <div class="flex flex-wrap gap-2">
-                <button onclick="exportCurrentKMLRoutes()" 
-                        class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                    💾 Export Routes
-                </button>
-                <button onclick="convertKMLToSystemRoutes()" 
-                        class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
-                    ⚡ Import to System
-                </button>
-                <button onclick="clearKMLLayer()" 
-                        class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
-                    🗑️ Clear KML
+    console.log('🗺️ Displaying', routes.length, 'KML routes on route creation map');
+    
+    routes.forEach((route, index) => {
+        if (route.stops && route.stops.length > 0) {
+            const routeColor = route.color || '#ff6b6b'; // Use red color to distinguish from new route being created
+            
+            if (googleMapsLoaded && routeCreationMap instanceof google.maps.Map) {
+                // Google Maps implementation
+                const path = route.stops.map(stop => ({
+                    lat: stop.latitude,
+                    lng: stop.longitude
+                }));
+                
+                // Create polyline for KML route
+                const polyline = new google.maps.Polyline({
+                    path: path,
+                    geodesic: true,
+                    strokeColor: routeColor,
+                    strokeOpacity: 0.6,
+                    strokeWeight: 3,
+                    map: routeCreationMap
+                });
+                
+                // Store reference for cleanup
+                if (!window.kmlRouteCreationPolylines) window.kmlRouteCreationPolylines = [];
+                window.kmlRouteCreationPolylines.push(polyline);
+                
+                // Add markers for KML route stops
+                route.stops.forEach((stop, stopIndex) => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: stop.latitude, lng: stop.longitude },
+                        map: routeCreationMap,
+                        title: `KML Route: ${route.name} - ${stop.name}`,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: routeColor,
+                            fillOpacity: 0.7,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 1
+                        }
+                    });
+                    
+                    // Add info window
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div style="padding: 8px; max-width: 200px;">
+                                <h4 style="margin: 0 0 8px 0; color: ${routeColor};">
+                                    📋 KML Reference: ${stop.name}
+                                </h4>
+                                <p style="margin: 2px 0; font-size: 12px;">
+                                    <strong>Route:</strong> ${route.name}
+                                </p>
+                                <p style="margin: 2px 0; font-size: 12px;">
+                                    <strong>Coordinates:</strong> ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}
+                                </p>
+                                <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">
+                                    📍 This is a reference from your uploaded KML file
+                                </p>
+                            </div>
+                        `
+                    });
+                    
+                    marker.addListener('click', () => {
+                        infoWindow.open(routeCreationMap, marker);
+                    });
+                    
+                    // Store reference for cleanup
+                    if (!window.kmlRouteCreationMarkers) window.kmlRouteCreationMarkers = [];
+                    window.kmlRouteCreationMarkers.push(marker);
+                });
+                
+            } else if (routeCreationMap) {
+                // Leaflet implementation
+                const latlngs = route.stops.map(stop => [stop.latitude, stop.longitude]);
+                
+                // Create polyline for KML route
+                const polyline = L.polyline(latlngs, {
+                    color: routeColor,
+                    weight: 3,
+                    opacity: 0.6,
+                    dashArray: '5, 5' // Dashed line to distinguish from new route
+                });
+                
+                polyline.addTo(routeCreationMap);
+                
+                // Store reference for cleanup
+                if (!window.kmlRouteCreationLayers) window.kmlRouteCreationLayers = [];
+                window.kmlRouteCreationLayers.push(polyline);
+                
+                // Add markers for KML route stops
+                route.stops.forEach((stop, stopIndex) => {
+                    const marker = L.marker([stop.latitude, stop.longitude], {
+                        icon: L.divIcon({
+                            className: 'kml-reference-marker',
+                            html: `
+                                <div style="
+                                    background-color: ${routeColor};
+                                    color: white;
+                                    border-radius: 50%;
+                                    width: 20px;
+                                    height: 20px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-weight: bold;
+                                    font-size: 10px;
+                                    border: 2px solid white;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                                    opacity: 0.8;
+                                ">
+                                    K
+                                </div>
+                            `,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    
+                    // Add popup
+                    marker.bindPopup(`
+                        <div style="min-width: 150px;">
+                            <h4 style="margin: 0 0 8px 0; color: ${routeColor};">
+                                📋 KML Reference: ${stop.name}
+                            </h4>
+                            <p style="margin: 2px 0; font-size: 12px;">
+                                <strong>Route:</strong> ${route.name}
+                            </p>
+                            <p style="margin: 2px 0; font-size: 12px;">
+                                <strong>Coordinates:</strong> ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}
+                            </p>
+                            <p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">
+                                📍 This is a reference from your uploaded KML file
+                            </p>
+                        </div>
+                    `);
+                    
+                    marker.addTo(routeCreationMap);
+                    
+                    // Store reference for cleanup
+                    if (!window.kmlRouteCreationLayers) window.kmlRouteCreationLayers = [];
+                    window.kmlRouteCreationLayers.push(marker);
+                });
+            }
+        }
+    });
+    
+    console.log('✅ KML routes displayed on route creation map');
+}
+
+/**
+ * Clear KML routes from route creation map
+ */
+function clearKMLRoutesFromRouteCreationMap() {
+    console.log('🧹 Clearing KML routes from route creation map');
+    
+    if (googleMapsLoaded && window.kmlRouteCreationMarkers) {
+        // Clear Google Maps markers and polylines
+        window.kmlRouteCreationMarkers.forEach(marker => marker.setMap(null));
+        window.kmlRouteCreationMarkers = [];
+        
+        if (window.kmlRouteCreationPolylines) {
+            window.kmlRouteCreationPolylines.forEach(polyline => polyline.setMap(null));
+            window.kmlRouteCreationPolylines = [];
+        }
+    } else if (window.kmlRouteCreationLayers) {
+        // Clear Leaflet layers
+        window.kmlRouteCreationLayers.forEach(layer => {
+            if (routeCreationMap && routeCreationMap.hasLayer(layer)) {
+                routeCreationMap.removeLayer(layer);
+            }
+        });
+        window.kmlRouteCreationLayers = [];
+    }
+}
+
+/**
+ * Load KML file within the route creation modal
+ * @param {File} file - The KML file to load
+ */
+function loadKMLFileInModal(file) {
+    console.log('📄 Loading KML file in modal:', file.name);
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const kmlContent = e.target.result;
+            parseKMLForModal(kmlContent, file.name);
+        } catch (error) {
+            console.error('Error reading KML file:', error);
+            showNotification('Failed to read KML file', 'error');
+        }
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * Parse KML content for display in the modal
+ * @param {string} kmlContent - The KML file content
+ * @param {string} fileName - Name of the KML file
+ */
+function parseKMLForModal(kmlContent, fileName) {
+    console.log('🔍 Parsing KML content for modal...');
+    
+    try {
+        // Parse KML using DOMParser
+        const parser = new DOMParser();
+        const kmlDoc = parser.parseFromString(kmlContent, 'application/xml');
+        
+        if (kmlDoc.getElementsByTagName('parsererror').length > 0) {
+            throw new Error('Invalid KML format');
+        }
+        
+        // Extract placemarks (routes, stops, etc.)
+        const placemarks = kmlDoc.getElementsByTagName('Placemark');
+        const modalKmlRoutes = [];
+        
+        console.log(`📍 Found ${placemarks.length} placemarks in KML`);
+        
+        for (let i = 0; i < placemarks.length; i++) {
+            const placemark = placemarks[i];
+            const routeData = extractRouteFromPlacemark(placemark);
+            
+            if (routeData) {
+                modalKmlRoutes.push(routeData);
+            }
+        }
+        
+        if (modalKmlRoutes.length > 0) {
+            displayKMLInModal(modalKmlRoutes, fileName);
+            
+            // If route creation map is already initialized, display the routes
+            if (routeCreationMap) {
+                displayKMLRoutesOnRouteCreationMap(modalKmlRoutes);
+            }
+            
+            // Store for later use when map is initialized
+            window.modalKmlData = modalKmlRoutes;
+            
+            showNotification(`Successfully loaded ${modalKmlRoutes.length} routes from ${fileName}`, 'success');
+        } else {
+            showNotification('No valid routes found in KML file', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('Error parsing KML:', error);
+        showNotification('Failed to parse KML file: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Display KML routes information in the modal
+ * @param {Array} routes - Array of KML routes
+ * @param {string} fileName - Name of the KML file
+ */
+function displayKMLInModal(routes, fileName) {
+    const kmlUploadArea = document.getElementById('kmlUploadArea');
+    const modalKmlDisplay = document.getElementById('modalKmlDisplay');
+    const clearKmlBtn = document.getElementById('clearKmlBtn');
+    
+    if (!modalKmlDisplay) {
+        console.error('Modal KML display area not found');
+        return;
+    }
+    
+    // Hide upload area and show display area
+    if (kmlUploadArea) kmlUploadArea.classList.add('hidden');
+    modalKmlDisplay.classList.remove('hidden');
+    if (clearKmlBtn) clearKmlBtn.classList.remove('hidden');
+    
+    modalKmlDisplay.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold text-green-800">
+                    <i class="fas fa-check-circle mr-2"></i> KML File Loaded Successfully
+                </h4>
+                <button onclick="clearKMLDataFromModal()" class="text-green-600 hover:text-green-800">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-        </div>
-        
-        <div class="space-y-2">
-            ${routes.map((route, index) => `
-                <div class="bg-white border rounded-lg p-3">
-                    <div class="flex items-center justify-between mb-2">
-                        <h5 class="font-semibold" style="color: ${route.color || '#3b82f6'};">
-                            🚍 ${route.name}
-                        </h5>
-                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">
-                            ${route.stops ? route.stops.length : 0} stops
-                        </span>
+            
+            <div class="text-sm text-green-700 mb-3">
+                <p><strong>File:</strong> ${fileName}</p>
+                <p><strong>Routes Found:</strong> ${routes.length}</p>
+            </div>
+            
+            <div class="space-y-2 max-h-32 overflow-y-auto">
+                ${routes.map((route, index) => `
+                    <div class="bg-white border border-green-200 rounded p-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-sm" style="color: ${route.color || '#ef4444'};">
+                                🚍 ${route.name}
+                            </span>
+                            <span class="text-xs bg-green-100 px-2 py-1 rounded">
+                                ${route.stops ? route.stops.length : 0} stops
+                            </span>
+                        </div>
+                        ${route.description ? `
+                            <p class="text-xs text-gray-600 mt-1">${route.description}</p>
+                        ` : ''}
                     </div>
-                    ${route.description ? `
-                        <p class="text-sm text-gray-600 mb-2">${route.description}</p>
-                    ` : ''}
-                    <div class="flex flex-wrap gap-1">
-                        <button onclick="focusOnKMLRoute(${index})" 
-                                class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">
-                            🎯 Focus
-                        </button>
-                        <button onclick="editKMLRoute(${index})" 
-                                class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200">
-                            ✏️ Edit
-                        </button>
-                        <button onclick="exportSingleKMLRoute(${index})" 
-                                class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">
-                            📤 Export
-                        </button>
-                    </div>
-                </div>
-            `).join('')}
+                `).join('')}
+            </div>
+            
+            <div class="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                <p class="text-xs text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>Reference Mode:</strong> KML routes are displayed on the map as reference (red/pink lines). 
+                    You can still create your own route normally by clicking on the map.
+                </p>
+            </div>
         </div>
     `;
+}
+
+/**
+ * Clear KML data from the modal
+ */
+function clearKMLDataFromModal() {
+    console.log('🧹 Clearing KML data from modal');
+    
+    const kmlUploadArea = document.getElementById('kmlUploadArea');
+    const modalKmlDisplay = document.getElementById('modalKmlDisplay');
+    const clearKmlBtn = document.getElementById('clearKmlBtn');
+    const modalKmlUpload = document.getElementById('modalKmlFileUpload');
+    
+    // Reset file input
+    if (modalKmlUpload) {
+        modalKmlUpload.value = '';
+    }
+    
+    // Show upload area and hide display area
+    if (kmlUploadArea) kmlUploadArea.classList.remove('hidden');
+    if (modalKmlDisplay) modalKmlDisplay.classList.add('hidden');
+    if (clearKmlBtn) clearKmlBtn.classList.add('hidden');
+    
+    // Clear KML routes from map
+    if (routeCreationMap) {
+        clearKMLRoutesFromRouteCreationMap();
+    }
+    
+    // Clear stored data
+    window.modalKmlData = null;
+    
+    showNotification('KML data cleared from route creation', 'info');
 }
 
 /**
@@ -1052,7 +1374,93 @@ function focusOnKMLRoute(routeIndex) {
 }
 
 /**
- * Convert KML routes to system routes
+ * Update KML routes display in the UI
+ * @param {Array} routes - Array of KML routes to display
+ * @param {string} fileName - Name of the KML file (optional)
+ */
+function updateKMLRoutesDisplay(routes, fileName = null) {
+    const kmlDisplay = document.getElementById('kmlRoutesContainer');
+    if (!kmlDisplay) {
+        console.warn('KML routes display element not found');
+        return;
+    }
+    
+    if (routes.length === 0) {
+        kmlDisplay.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-upload text-3xl mb-2"></i>
+                <p>No KML routes loaded</p>
+                <p class="text-sm">Upload a KML file to get started</p>
+            </div>
+        `;
+        return;
+    }
+    
+    kmlDisplay.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <h4 class="font-semibold text-green-800 mb-2">
+                <i class="fas fa-check-circle mr-2"></i> KML File Loaded Successfully
+            </h4>
+            ${fileName ? `
+                <p class="text-green-700 text-sm mb-2">
+                    <strong>File:</strong> ${fileName}
+                </p>
+            ` : ''}
+            <p class="text-green-700 text-sm mb-3">
+                <strong>Routes Found:</strong> ${routes.length}
+            </p>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="exportCurrentKMLRoutes()" 
+                        class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                    💾 Export Routes
+                </button>
+                <button onclick="convertKMLToSystemRoutes()" 
+                        class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                    ⚡ Import to Firebase
+                </button>
+                <button onclick="clearKMLLayer()" 
+                        class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                    🗑️ Clear KML
+                </button>
+            </div>
+        </div>
+        
+        <div class="space-y-2">
+            ${routes.map((route, index) => `
+                <div class="bg-white border rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="font-semibold" style="color: ${route.color || '#3b82f6'};">
+                            🚍 ${route.name}
+                        </h5>
+                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">
+                            ${route.stops ? route.stops.length : 0} stops
+                        </span>
+                    </div>
+                    ${route.description ? `
+                        <p class="text-sm text-gray-600 mb-2">${route.description}</p>
+                    ` : ''}
+                    <div class="flex flex-wrap gap-1">
+                        <button onclick="focusOnKMLRoute(${index})" 
+                                class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">
+                            🎯 Focus
+                        </button>
+                        <button onclick="editKMLRoute(${index})" 
+                                class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="exportSingleKMLRoute(${index})" 
+                                class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">
+                            📤 Export
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+/**
+ * Convert KML routes to system routes and save to Firebase
  */
 function convertKMLToSystemRoutes() {
     if (routeKmlData.length === 0) {
@@ -1060,44 +1468,83 @@ function convertKMLToSystemRoutes() {
         return;
     }
     
+    if (!database) {
+        showNotification('Database not connected. Please check your internet connection.', 'error');
+        return;
+    }
+    
+    showNotification('Converting KML routes to system routes...', 'info');
+    
     let convertedCount = 0;
+    const conversionPromises = [];
     
     routeKmlData.forEach(kmlRoute => {
         if (kmlRoute.stops && kmlRoute.stops.length > 0) {
-            // Create system route object
+            // Create system route object with proper structure for Firebase
             const systemRoute = {
-                id: 'imported_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                name: kmlRoute.name,
-                city: 'imported', // Default city - admin can change later
-                color: kmlRoute.color || '#3b82f6',
+                id: 'kml_import_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                routeNumber: `KML-${String(convertedCount + 1).padStart(3, '0')}`,
+                routeName: kmlRoute.name || 'Imported KML Route',
+                city: 'KML_Imported', // Default city - admin can change later
+                routeType: 'city_bus',
+                description: kmlRoute.description || 'Route imported from KML file',
+                firstBusTime: '06:00',
+                lastBusTime: '22:00',
+                frequency: 30, // Default 30 minutes
                 stops: kmlRoute.stops.map(stop => ({
                     id: stop.id || `stop_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    name: stop.name,
-                    lat: stop.latitude,
-                    lng: stop.longitude,
+                    name: stop.name || 'Imported Stop',
+                    latitude: stop.latitude,
+                    longitude: stop.longitude,
                     stopTime: stop.stopTime || 2
                 })),
-                type: 'imported_from_kml',
-                source: 'kml_import',
+                status: 'active',
+                createdAt: new Date().toISOString(),
+                createdBy: 'admin_kml_import',
                 importedAt: new Date().toISOString(),
-                description: kmlRoute.description || ''
+                source: 'kml_import',
+                kmlFileName: currentKmlFile || 'unknown.kml'
             };
             
-            // Add to routes (you would typically save this to your database)
-            allRoutes[systemRoute.id] = systemRoute;
-            convertedCount++;
+            // Create promise for Firebase save
+            const savePromise = database.ref(`routes/${systemRoute.city}/${systemRoute.id}`).set(systemRoute)
+                .then(() => {
+                    // Add to local routes for immediate display
+                    allRoutes[systemRoute.id] = systemRoute;
+                    convertedCount++;
+                    console.log('KML route saved to Firebase:', systemRoute.id);
+                })
+                .catch(error => {
+                    console.error('Error saving KML route to Firebase:', error);
+                    throw error;
+                });
             
-            console.log('Converted KML route to system route:', systemRoute);
+            conversionPromises.push(savePromise);
         }
     });
     
-    if (convertedCount > 0) {
-        showNotification(`Successfully converted ${convertedCount} KML routes to system routes`, 'success');
-        // Refresh routes list
-        loadRoutes();
-    } else {
-        showNotification('No valid routes found to convert', 'warning');
-    }
+    // Wait for all routes to be saved to Firebase
+    Promise.all(conversionPromises)
+        .then(() => {
+            if (convertedCount > 0) {
+                showNotification(`Successfully imported ${convertedCount} KML routes to Firebase database!`, 'success');
+                // Refresh routes list to show the new routes
+                loadAllRoutes();
+                
+                // Clear the KML data since it's now imported
+                routeKmlData = [];
+                clearKMLLayer();
+                
+                // Update the KML display
+                updateKMLRoutesDisplay([]);
+            } else {
+                showNotification('No valid routes found to import', 'warning');
+            }
+        })
+        .catch(error => {
+            console.error('Error importing KML routes to Firebase:', error);
+            showNotification('Failed to import some routes to database. Please try again.', 'error');
+        });
 }
 
 /**
@@ -2531,6 +2978,17 @@ function showCreateRouteModal() {
         console.error('❌ Route stops list element not found!');
     }
     
+    // Show/hide KML indicator
+    const kmlIndicator = document.getElementById('kmlIndicator');
+    if (kmlIndicator) {
+        if (routeKmlData && routeKmlData.length > 0) {
+            kmlIndicator.classList.remove('hidden');
+            kmlIndicator.innerHTML = `<i class="fas fa-file-code mr-1"></i> KML Data Available (${routeKmlData.length} route${routeKmlData.length > 1 ? 's' : ''})`;
+        } else {
+            kmlIndicator.classList.add('hidden');
+        }
+    }
+    
     // Initialize map with longer delay to ensure modal is fully rendered
     setTimeout(() => {
         console.log('🗺️ Starting map initialization...');
@@ -2543,6 +3001,13 @@ function showCreateRouteModal() {
             initializeGoogleRouteCreationMap();
         } else {
             initializeRouteCreationMap(); // Fallback to Leaflet
+        }
+        
+        // If we have KML data loaded, display it on the route creation map
+        if (routeKmlData && routeKmlData.length > 0) {
+            console.log('📍 Displaying KML data on route creation map...');
+            displayKMLRoutesOnRouteCreationMap(routeKmlData);
+            showNotification(`Showing ${routeKmlData.length} KML route(s) on the map for reference`, 'info');
         }
     }, 1000); // Increased timeout for better modal rendering
 }
@@ -2563,6 +3028,12 @@ function closeCreateRouteModal() {
     const modal = document.getElementById('createRouteModal');
     modal.classList.add('hidden');
     modal.classList.remove('modal-backdrop');
+    
+    // Clear KML routes from route creation map before destroying it
+    clearKMLRoutesFromRouteCreationMap();
+    
+    // Clear modal KML data
+    window.modalKmlData = null;
     
     if (routeCreationMap) {
         routeCreationMap.remove();
@@ -2767,6 +3238,18 @@ function initializeRouteCreationMap() {
                     </div>
                 `)
                 .openOn(routeCreationMap);
+        }
+        
+        // If we have KML data loaded, display it on this map too
+        if (routeKmlData && routeKmlData.length > 0) {
+            console.log('📍 Displaying KML data on Leaflet route creation map...');
+            displayKMLRoutesOnRouteCreationMap(routeKmlData);
+        }
+        
+        // Check for modal KML data
+        if (window.modalKmlData && window.modalKmlData.length > 0) {
+            console.log('📍 Displaying modal KML data on Leaflet route creation map...');
+            displayKMLRoutesOnRouteCreationMap(window.modalKmlData);
         }
         
     } catch (error) {
@@ -3019,6 +3502,20 @@ function resetRouteForm() {
     document.getElementById('routeStopsList').innerHTML = '';
     routeStops = [];
     routePolyline = null;
+    
+    // Clear modal KML data if any
+    window.modalKmlData = null;
+    
+    // Reset KML UI elements
+    const kmlUploadArea = document.getElementById('kmlUploadArea');
+    const modalKmlDisplay = document.getElementById('modalKmlDisplay');
+    const clearKmlBtn = document.getElementById('clearKmlBtn');
+    const modalKmlUpload = document.getElementById('modalKmlFileUpload');
+    
+    if (kmlUploadArea) kmlUploadArea.classList.remove('hidden');
+    if (modalKmlDisplay) modalKmlDisplay.classList.add('hidden');
+    if (clearKmlBtn) clearKmlBtn.classList.add('hidden');
+    if (modalKmlUpload) modalKmlUpload.value = '';
 }
 
 // Handle route creation form submission

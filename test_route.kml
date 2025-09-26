@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Test Punjab Bus Route</name>
+    <description>Sample bus route for testing KML import functionality</description>
+    
+    <!-- Route Styles -->
+    <Style id="routeStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+    
+    <Style id="stopStyle">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+    
+    <!-- Test Route Path -->
+    <Placemark>
+      <name>Chandigarh Express Route</name>
+      <description>Express route from Sector 17 to Railway Station</description>
+      <styleUrl>#routeStyle</styleUrl>
+      <LineString>
+        <coordinates>
+          76.7822,30.7410,0
+          76.7752,30.7340,0
+          76.7692,30.7280,0
+          76.7602,30.7240,0
+          76.7542,30.7180,0
+        </coordinates>
+      </LineString>
+    </Placemark>
+    
+    <!-- Bus Stops -->
+    <Placemark>
+      <name>Sector 17 Terminal</name>
+      <description>Main bus terminal at Sector 17</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>76.7822,30.7410,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Sector 22 Stop</name>
+      <description>Bus stop at Sector 22</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>76.7752,30.7340,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Sector 35 Stop</name>
+      <description>Bus stop at Sector 35</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>76.7692,30.7280,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>ISBT Sector 43</name>
+      <description>Inter State Bus Terminal</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>76.7602,30.7240,0</coordinates>
+      </Point>
+    </Placemark>
+    
+    <Placemark>
+      <name>Railway Station</name>
+      <description>Chandigarh Railway Station</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>76.7542,30.7180,0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>

@@ -414,6 +414,46 @@
                         </div>
                     </div>
 
+                    <!-- KML Route Import/Export -->
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-globe mr-2 text-green-600"></i> Google Earth KML Routes
+                        </h3>
+                        <div class="space-y-3">
+                            <!-- KML File Upload -->
+                            <div class="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-green-600 mb-2"></i>
+                                <p class="text-sm text-gray-600 mb-2">Upload KML file from Google Earth</p>
+                                <input type="file" id="kmlFileUpload" accept=".kml,.kmz" class="hidden">
+                                <button onclick="document.getElementById('kmlFileUpload').click()" 
+                                        class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm">
+                                    <i class="fas fa-file-upload mr-2"></i> Select KML File
+                                </button>
+                            </div>
+                            
+                            <!-- KML Actions -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="exportSystemRoutesToKML()" 
+                                        class="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition text-sm">
+                                    <i class="fas fa-download mr-1"></i> Export to KML
+                                </button>
+                                <button onclick="showKMLHelp()" 
+                                        class="bg-gray-500 text-white p-2 rounded-lg hover:bg-gray-600 transition text-sm">
+                                    <i class="fas fa-question-circle mr-1"></i> Help
+                                </button>
+                            </div>
+                            
+                            <!-- KML Status -->
+                            <div id="kmlStatus" class="text-xs text-gray-500 text-center">
+                                No KML file loaded
+                            </div>
+                        </div>
+                        
+                        <!-- KML Routes Display -->
+                        <div id="kmlRoutesContainer" class="mt-4">
+                            <!-- KML routes will be displayed here -->
+                        </div>
+                    </div>
 
                     <!-- IoT Device Management -->
                     <div class="bg-white p-6 rounded-lg shadow-lg">
