@@ -1,5 +1,5 @@
 // ===================================
-// Punjab Transport Tracker - Driver App
+// Punjab Transport Tracker - Enhanced Driver App with IoT Support
 // ===================================
 
 // Global variables
@@ -8,6 +8,9 @@ let isTracking = false;
 let watchId = null;
 let driverLocationWatchId = null; // For tracking driver location even when not on duty
 let deviceId = null; // Store device ID for this session
+let trackingMode = 'mobile'; // 'mobile' or 'iot'
+let iotDeviceId = null; // Associated IoT device ID
+let iotDataInterval = null; // Interval for receiving IoT data
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Driver app DOM loaded');
@@ -70,25 +73,47 @@ function driverLogin(event) {
     const validDriver = PTTConfig.demo.drivers.find(d => d.id === driverId && d.phone === phone);
     
     if (validDriver) {
+        const loginTime = Date.now();
         driverInfo = {
             ...validDriver,
-            deviceId: deviceId, // Add device ID to driver info
-            sessionStart: Date.now()
+            deviceId: deviceId,
+            sessionStart: loginTime,
+            workShiftStart: loginTime, // Track when work shift begins
+            totalWorkHours: 0, // Initialize work hours counter
+            breakTime: 0, // Track break duration
+            fatigueLevel: 'normal' // Track fatigue level
         };
         
-        // Store driver info with device ID
+        // Store driver info with work tracking data
         sessionStorage.setItem('driverInfo', JSON.stringify(driverInfo));
         
-        // Log device association in Firebase
+        // Log driver work session in Firebase for fatigue management
         if (database) {
-            database.ref(`driver_devices/${driverId}`).set({
+            database.ref(`driver_work_sessions/${driverId}/${loginTime}`).set({
+                driverId: driverId,
+                driverName: validDriver.name,
+                sessionStart: firebase.database.ServerValue.TIMESTAMP,
                 deviceId: deviceId,
-                driverInfo: driverInfo,
-                lastLogin: firebase.database.ServerValue.TIMESTAMP,
+                status: 'logged_in',
+                shiftType: getShiftType(loginTime), // morning/afternoon/night
                 deviceInfo: PTTConfig.utils.getDeviceInfo()
             }).catch(error => {
-                console.warn('Failed to log device association:', error);
+                console.warn('Failed to log work session:', error);
             });
+            
+            // Update driver current status
+            database.ref(`drivers_status/${driverId}`).set({
+                status: 'logged_in',
+                lastLogin: firebase.database.ServerValue.TIMESTAMP,
+                deviceId: deviceId,
+                currentShiftStart: loginTime
+            }).catch(error => {
+                console.warn('Failed to update driver status:', error);
+            });
+        }
+        
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification(`Welcome ${validDriver.name}! Work shift started.`, 'success');
         }
         
         showDashboard();
@@ -107,375 +132,401 @@ function showDashboard() {
     document.getElementById('driverDashboard').classList.remove('hidden');
     document.getElementById('driverName').textContent = `Welcome, ${driverInfo.name}`;
     
-    // Populate driver info card
+    // Populate driver info card with work session details
     const infoDiv = document.getElementById('driverInfo');
     infoDiv.innerHTML = `
         <p><strong>ID:</strong> ${driverInfo.id}</p>
         <p><strong>Name:</strong> ${driverInfo.name}</p>
         <p><strong>Phone:</strong> ${driverInfo.phone}</p>
+        <p><strong>Shift Started:</strong> ${new Date(driverInfo.workShiftStart).toLocaleTimeString()}</p>
+        <p><strong>Fatigue Level:</strong> <span id="fatigueLevel" class="${getFatigueLevelColor(driverInfo.fatigueLevel)}">${driverInfo.fatigueLevel.toUpperCase()}</span></p>
     `;
 
-    // Initialize map with a slight delay to ensure DOM is ready
+    // Initialize engaging dashboard (no tracking modes)
+    initializeEngagingDashboard();
+
+    // Initialize map without GPS tracking
     setTimeout(() => {
         initializeDriverMap();
-        // Start tracking driver's location immediately upon login
-        startDriverLocationTracking();
+        // Start work hour tracking
+        startWorkHourTracking();
+        // Update dashboard stats
+        updateDashboardStats();
     }, 100);
     
     document.getElementById('busCity').addEventListener('change', populateRoutes);
 }
 
-// Function to start tracking driver's location immediately upon login
-function startDriverLocationTracking() {
-    if (!navigator.geolocation) {
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification('Geolocation is not supported by your browser', 'error');
+// Helper function to determine shift type
+function getShiftType(timestamp) {
+    const hour = new Date(timestamp).getHours();
+    if (hour >= 6 && hour < 14) return 'morning';
+    if (hour >= 14 && hour < 22) return 'afternoon';
+    return 'night';
+}
+
+// Helper function to get fatigue level color class
+function getFatigueLevelColor(level) {
+    switch(level) {
+        case 'normal': return 'text-green-600';
+        case 'caution': return 'text-yellow-600';
+        case 'danger': return 'text-red-600';
+        default: return 'text-gray-600';
+    }
+}
+
+// Start work hour tracking for fatigue management
+function startWorkHourTracking() {
+    // Update work hours every minute
+    setInterval(() => {
+        if (driverInfo && driverInfo.workShiftStart) {
+            const currentTime = Date.now();
+            const workHours = (currentTime - driverInfo.workShiftStart) / (1000 * 60 * 60); // Convert to hours
+            
+            // Update driver info
+            driverInfo.totalWorkHours = workHours;
+            
+            // Calculate fatigue level based on work hours
+            let fatigueLevel = 'normal';
+            if (workHours >= 8) fatigueLevel = 'caution';
+            if (workHours >= 12) fatigueLevel = 'danger';
+            
+            driverInfo.fatigueLevel = fatigueLevel;
+            
+            // Update session storage
+            sessionStorage.setItem('driverInfo', JSON.stringify(driverInfo));
+            
+            // Update both old and new UI elements
+            updateWorkHourDisplay();
+            updateDashboardStats();
+            
+            // Log work hours in Firebase every 30 minutes
+            if (Math.floor(workHours * 2) !== Math.floor((workHours - 1/60) * 2)) {
+                logWorkHours();
+            }
+            
+            // Show fatigue warnings
+            if (workHours >= 8 && workHours < 8.1) {
+                if (typeof CommonUtils !== 'undefined') {
+                    CommonUtils.showNotification('You\'ve been working for 8 hours. Consider taking a break soon! ☕', 'warning');
+                }
+            } else if (workHours >= 12 && workHours < 12.1) {
+                if (typeof CommonUtils !== 'undefined') {
+                    CommonUtils.showNotification('Important: You\'ve reached 12 hours of work. Please take a mandatory rest! 😴', 'error');
+                }
+            }
+        }
+    }, 60000); // Every minute
+    
+    console.log('Work hour tracking started');
+}
+
+// Update work hour display in UI (legacy support)
+function updateWorkHourDisplay() {
+    const fatigueElement = document.getElementById('fatigueLevel');
+    const tripDurationElement = document.getElementById('tripDuration');
+    
+    if (fatigueElement) {
+        fatigueElement.textContent = driverInfo.fatigueLevel.toUpperCase();
+        fatigueElement.className = getFatigueLevelColor(driverInfo.fatigueLevel);
+    }
+    
+    if (tripDurationElement) {
+        const hours = Math.floor(driverInfo.totalWorkHours);
+        const minutes = Math.floor((driverInfo.totalWorkHours % 1) * 60);
+        tripDurationElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+}
+
+// Update dashboard statistics in real-time
+function updateDashboardStats() {
+    // Update work hours
+    const workHoursElement = document.getElementById('dashboardWorkHours');
+    if (workHoursElement && driverInfo) {
+        const hours = Math.floor(driverInfo.totalWorkHours || 0);
+        const minutes = Math.floor(((driverInfo.totalWorkHours || 0) % 1) * 60);
+        workHoursElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    
+    // Update status based on current activity
+    const statusElement = document.getElementById('dashboardStatus');
+    if (statusElement) {
+        if (isTracking) {
+            statusElement.textContent = 'On Duty';
+            statusElement.className = 'text-lg font-bold text-green-400';
+        } else if (busAssignment) {
+            statusElement.textContent = 'Ready';
+            statusElement.className = 'text-lg font-bold text-blue-400';
         } else {
-            alert('Geolocation is not supported by your browser');
+            statusElement.textContent = 'Standby';
+            statusElement.className = 'text-lg font-bold text-yellow-400';
+        }
+    }
+    
+    // Update map driver name
+    const mapDriverNameElement = document.getElementById('mapDriverName');
+    if (mapDriverNameElement && driverInfo) {
+        if (isTracking) {
+            mapDriverNameElement.textContent = `${driverInfo.name} - On Duty`;
+        } else {
+            mapDriverNameElement.textContent = `${driverInfo.name} - Ready`;
+        }
+    }
+    
+    // Simulate trip count (in real app, this would come from database)
+    const tripsElement = document.getElementById('dashboardTrips');
+    if (tripsElement) {
+        const tripCount = sessionStorage.getItem('todayTrips') || '0';
+        tripsElement.textContent = tripCount;
+    }
+    
+    // Update rating (in real app, this would come from passenger feedback)
+    const ratingElement = document.getElementById('dashboardRating');
+    if (ratingElement) {
+        const rating = driverInfo.rating || 4.8;
+        ratingElement.textContent = rating.toFixed(1);
+    }
+}
+
+// Add interactive notifications and motivational messages
+function showMotivationalMessage() {
+    const messages = [
+        { text: "Great job maintaining perfect safety record! 🛡️", type: "success" },
+        { text: "You're helping keep Punjab moving! 🚌", type: "info" },
+        { text: "Remember to take breaks for your wellbeing 😌", type: "info" },
+        { text: "Your punctuality is appreciated by passengers! ⏰", type: "success" },
+        { text: "Drive safe, drive smart! 🛣️", type: "info" }
+    ];
+    
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    
+    if (typeof CommonUtils !== 'undefined') {
+        CommonUtils.showNotification(randomMessage.text, randomMessage.type, 4000);
+    }
+}
+
+// Enhanced bus assignment with better validation
+function saveBusAssignment() {
+    const city = document.getElementById('busCity').value;
+    const busNumber = document.getElementById('busNumber').value;
+    const routeId = document.getElementById('busRoute').value;
+
+    console.log('Bus assignment attempt:', { city, busNumber, routeId });
+
+    if (!city || !busNumber || !routeId) {
+        const missingFields = [];
+        if (!city) missingFields.push('City');
+        if (!busNumber) missingFields.push('Bus Number');
+        if (!routeId) missingFields.push('Route');
+        
+        const message = `Please fill out: ${missingFields.join(', ')}`;
+        
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification(message, 'warning');
+        } else {
+            alert(message);
         }
         return;
     }
 
-    // Enhanced GPS options with better timeout and fallback settings
-    const options = {
-        enableHighAccuracy: true,
-        timeout: 30000, // Increased to 30 seconds
-        maximumAge: 60000 // Allow cached position up to 60 seconds
-    };
-
-    // Show GPS initialization status
-    if (typeof CommonUtils !== 'undefined') {
-        CommonUtils.showNotification('Initializing GPS... Please wait', 'info', 5000);
-    }
-
-    // Get initial position with retry mechanism
-    attemptLocationRequest(options, 0, 3); // Try up to 3 times
-
-    // Start watching position with enhanced error handling
-    startLocationWatching(options);
-}
-
-// Enhanced location request with retry mechanism
-function attemptLocationRequest(options, attempt, maxAttempts) {
-    console.log(`GPS attempt ${attempt + 1}/${maxAttempts}`);
+    busAssignment = { city, busNumber, routeId };
     
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            console.log('GPS initial position acquired successfully');
-            updateDriverLocationOnMap(position);
-            if (typeof CommonUtils !== 'undefined') {
-                CommonUtils.showNotification('GPS location acquired successfully', 'success');
-            }
-        },
-        (error) => {
-            console.warn(`GPS attempt ${attempt + 1} failed:`, error);
-            handleLocationError(error, attempt, maxAttempts, options);
-        },
-        options
-    );
-}
-
-// Enhanced location error handling
-function handleLocationError(error, attempt, maxAttempts, options) {
-    let errorMessage = 'Location access failed';
-    let shouldRetry = false;
-    
-    // Update GPS status to show error
-    updateGPSStatus(null, 'error');
-    
-    switch(error.code) {
-        case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
-            break;
-        case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable. Please check if GPS is enabled.';
-            shouldRetry = attempt < maxAttempts - 1;
-            break;
-        case error.TIMEOUT:
-            errorMessage = `GPS timeout (attempt ${attempt + 1}/${maxAttempts}). Retrying with relaxed settings...`;
-            shouldRetry = attempt < maxAttempts - 1;
-            // Update status to show searching during retry
-            if (shouldRetry) {
-                updateGPSStatus(null, 'searching');
-            }
-            break;
-        default:
-            errorMessage = `Unknown location error: ${error.message}`;
-            shouldRetry = attempt < maxAttempts - 1;
-    }
-    
-    console.warn(errorMessage);
-    
-    if (shouldRetry) {
-        // Use progressively relaxed settings for retries
-        const retryOptions = {
-            enableHighAccuracy: attempt === 0, // High accuracy only on first attempt
-            timeout: 45000 + (attempt * 15000), // Increase timeout with each attempt
-            maximumAge: 120000 + (attempt * 60000) // Allow older cached positions
-        };
-        
-        setTimeout(() => {
-            attemptLocationRequest(retryOptions, attempt + 1, maxAttempts);
-        }, 2000); // Wait 2 seconds between attempts
-        
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification(`GPS retry ${attempt + 1}/${maxAttempts - 1}...`, 'warning');
-        }
-    } else {
-        // All attempts failed, show final error
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification(errorMessage, 'error', 8000);
-        } else {
-            alert(errorMessage);
-        }
-        
-        // Try to get last known location from session storage
-        tryLastKnownLocation();
-    }
-}
-
-// Start continuous location watching with enhanced error handling
-function startLocationWatching(initialOptions) {
-    const watchOptions = {
-        enableHighAccuracy: false, // Use less accurate but more reliable mode for continuous tracking
-        timeout: 20000, // Shorter timeout for continuous updates
-        maximumAge: 30000 // Allow some caching for continuous updates
-    };
-
-    driverLocationWatchId = navigator.geolocation.watchPosition(
-        (position) => {
-            updateDriverLocationOnMap(position);
-            // Reset any error states
-            clearLocationErrorState();
-        },
-        (error) => {
-            console.warn('Continuous location tracking error:', error);
-            handleContinuousLocationError(error);
-        },
-        watchOptions
-    );
-
-    console.log('Continuous GPS tracking started with ID:', driverLocationWatchId);
-}
-
-// Handle errors during continuous location tracking
-function handleContinuousLocationError(error) {
-    // Don't spam notifications for continuous tracking errors
-    const now = Date.now();
-    const lastErrorNotification = sessionStorage.getItem('lastGPSErrorNotification');
-    
-    if (!lastErrorNotification || (now - parseInt(lastErrorNotification)) > 60000) { // Only show error every minute
-        let message = 'GPS signal weak';
-        
-        switch(error.code) {
-            case error.TIMEOUT:
-                message = 'GPS signal timeout - using last known position';
-                break;
-            case error.POSITION_UNAVAILABLE:
-                message = 'GPS unavailable - check device settings';
-                break;
-        }
-        
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification(message, 'warning', 3000);
-        }
-        
-        sessionStorage.setItem('lastGPSErrorNotification', now.toString());
-    }
-}
-
-// Try to use last known location if GPS fails
-function tryLastKnownLocation() {
-    const lastLocation = CommonUtils.getSession('driverLocation');
-    if (lastLocation && (Date.now() - lastLocation.timestamp) < 600000) { // Use if less than 10 minutes old
-        console.log('Using last known location:', lastLocation);
-        
-        const fakePosition = {
-            coords: {
-                latitude: lastLocation.lat,
-                longitude: lastLocation.lng,
-                accuracy: 1000 // Mark as low accuracy
-            },
-            timestamp: lastLocation.timestamp
-        };
-        
-        updateDriverLocationOnMap(fakePosition);
-        
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification('Using last known location (GPS unavailable)', 'info');
-        }
-    } else {
-        console.log('No suitable last known location available');
-        showManualLocationOption();
-    }
-}
-
-// Clear any location error states
-function clearLocationErrorState() {
-    sessionStorage.removeItem('lastGPSErrorNotification');
-}
-
-// Show option for manual location input as last resort
-function showManualLocationOption() {
-    if (typeof CommonUtils !== 'undefined') {
-        const modal = CommonUtils.createModal(
-            'GPS Not Available',
-            `
-                <div class="text-center space-y-4">
-                    <i class="fas fa-exclamation-triangle text-yellow-500 text-4xl"></i>
-                    <p class="text-gray-700">GPS location is not available. You can:</p>
-                    <div class="space-y-2 text-left">
-                        <p class="text-sm text-gray-600">• Check if location services are enabled in device settings</p>
-                        <p class="text-sm text-gray-600">• Allow location access when prompted by the browser</p>
-                        <p class="text-sm text-gray-600">• Move to an area with better GPS signal (outdoors)</p>
-                        <p class="text-sm text-gray-600">• Close other apps that might be using GPS</p>
-                        <p class="text-sm text-gray-600">• Restart your browser and try again</p>
-                    </div>
-                    <div class="bg-blue-50 p-3 rounded mt-4">
-                        <p class="text-sm text-blue-800"><strong>For best results:</strong></p>
-                        <p class="text-xs text-blue-700">Use the app outdoors with a clear view of the sky</p>
-                    </div>
-                </div>
-            `,
-            `
-                <button onclick="this.closest('.fixed').remove(); window.location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    <i class="fas fa-refresh mr-1"></i> Try Again
-                </button>
-                <button onclick="showGPSTroubleshooting()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                    <i class="fas fa-question-circle mr-1"></i> Troubleshooting
-                </button>
-                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                    Continue Without GPS
-                </button>
-            `
-        );
-    }
-}
-
-// Show detailed GPS troubleshooting guide
-function showGPSTroubleshooting() {
-    if (typeof CommonUtils !== 'undefined') {
-        const modal = CommonUtils.createModal(
-            'GPS Troubleshooting Guide',
-            `
-                <div class="space-y-4 max-h-96 overflow-y-auto">
-                    <div class="border-b pb-3">
-                        <h4 class="font-semibold text-gray-800 mb-2">1. Browser Permissions</h4>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li>• Click the location icon in your browser's address bar</li>
-                            <li>• Select "Always allow" for location access</li>
-                            <li>• Refresh the page after changing permissions</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="border-b pb-3">
-                        <h4 class="font-semibold text-gray-800 mb-2">2. Device Settings</h4>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li><strong>Android:</strong> Settings > Location > Turn on</li>
-                            <li><strong>iPhone:</strong> Settings > Privacy > Location Services > On</li>
-                            <li><strong>Windows:</strong> Settings > Privacy > Location > On</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="border-b pb-3">
-                        <h4 class="font-semibold text-gray-800 mb-2">3. Environment</h4>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li>• Go outdoors for better GPS signal</li>
-                            <li>• Avoid areas with tall buildings or tunnels</li>
-                            <li>• Wait 30-60 seconds for GPS to acquire signal</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="bg-yellow-50 p-3 rounded">
-                        <h4 class="font-semibold text-yellow-800 mb-2">Still having issues?</h4>
-                        <p class="text-sm text-yellow-700">Contact your system administrator with the device ID: <code class="bg-yellow-200 px-1 rounded">${deviceId || 'Not available'}</code></p>
-                    </div>
-                </div>
-            `,
-            `
-                <button onclick="this.closest('.fixed').remove(); window.location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    <i class="fas fa-refresh mr-1"></i> Try Again
-                </button>
-                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
-                    Close
-                </button>
-            `
-        );
-    }
-}
-
-// Function to update driver location on map (before bus assignment)
-function updateDriverLocationOnMap(position) {
-    const { latitude, longitude, accuracy } = position.coords;
-    
-    // Update GPS accuracy display and status
-    updateGPSStatus(accuracy, 'active');
-
-    // Update map marker
-    const latLng = [latitude, longitude];
-    
-    if (driverMarker) {
-        driverMarker.setLatLng(latLng);
-    } else {
-        // Create driver marker with different style when not on duty
-        const driverIcon = L.divIcon({ 
-            className: 'driver-marker-standby', 
-            html: '<i class="fas fa-user-circle"></i>', 
-            iconSize: [25, 25],
-            iconAnchor: [12, 12]
-        });
-        driverMarker = L.marker(latLng, { icon: driverIcon }).addTo(driverMap);
-        driverMarker.bindPopup(`Driver: ${driverInfo.name}<br>Status: Standby`);
-    }
-    
-    // Center map on driver location on first update
-    if (!driverMap._mapInitialCentered) {
-        driverMap.setView(latLng, 15);
-        driverMap._mapInitialCentered = true;
-    }
-
-    // Store driver location in session for potential use
-    if (typeof CommonUtils !== 'undefined') {
-        CommonUtils.setSession('driverLocation', {
-            lat: latitude,
-            lng: longitude,
-            timestamp: Date.now(),
-            accuracy: accuracy
+    // Log assignment in Firebase
+    if (database && driverInfo) {
+        database.ref(`driver_bus_assignments/${driverInfo.id}`).set({
+            ...busAssignment,
+            assignedAt: firebase.database.ServerValue.TIMESTAMP,
+            driverName: driverInfo.name
+        }).catch(error => {
+            console.warn('Failed to log bus assignment:', error);
         });
     }
+    
+    // Get route name for display
+    let routeName = 'Selected Route';
+    try {
+        if (PTTConfig && PTTConfig.data && PTTConfig.data.routes && PTTConfig.data.routes[city]) {
+            const route = PTTConfig.data.routes[city].find(r => r.id === routeId);
+            if (route) {
+                routeName = route.name;
+            }
+        }
+    } catch (error) {
+        console.warn('Could not get route name:', error);
+    }
+    
+    // Show success message
+    if (typeof CommonUtils !== 'undefined') {
+        CommonUtils.showNotification(`✅ Successfully assigned to Bus ${busNumber} on ${routeName}! 🚌`, 'success');
+    } else {
+        alert('Bus assignment saved!');
+    }
+    
+    // Enable tracking button
+    const trackingBtn = document.getElementById('trackingBtn');
+    if (trackingBtn) {
+        trackingBtn.disabled = false;
+        trackingBtn.classList.remove('bg-gray-400');
+        trackingBtn.classList.add('bg-white');
+    }
+    
+    // Update status message
+    const statusMessage = document.querySelector('#trackingStatus p');
+    if (statusMessage) {
+        statusMessage.textContent = 'Ready to start your service! Good luck!';
+    }
+    
+    // Update dashboard stats
+    updateDashboardStats();
+    
+    // Show motivational message
+    setTimeout(showMotivationalMessage, 2000);
+    
+    console.log('Bus assignment saved successfully:', busAssignment);
 }
 
-// Update GPS status indicator
-function updateGPSStatus(accuracy, status) {
-    const accuracyElement = document.getElementById('gpsAccuracy');
-    const statusElement = document.getElementById('gpsStatus');
-    const iconElement = document.getElementById('gpsStatusIcon');
-    
-    if (accuracyElement) {
-        accuracyElement.textContent = accuracy ? Math.round(accuracy) : '--';
-    }
-    
-    if (statusElement && iconElement) {
-        switch(status) {
-            case 'active':
-                const qualityText = accuracy <= 10 ? 'Excellent' : accuracy <= 50 ? 'Good' : accuracy <= 100 ? 'Fair' : 'Poor';
-                statusElement.textContent = qualityText;
-                iconElement.className = accuracy <= 50 ? 'fas fa-satellite text-green-600' : accuracy <= 100 ? 'fas fa-satellite text-yellow-600' : 'fas fa-satellite text-red-600';
-                break;
-            case 'error':
-                statusElement.textContent = 'Error';
-                iconElement.className = 'fas fa-satellite text-red-600';
-                break;
-            case 'searching':
-                statusElement.textContent = 'Searching...';
-                iconElement.className = 'fas fa-satellite text-blue-600 fa-pulse';
-                break;
-            default:
-                statusElement.textContent = 'Unknown';
-                iconElement.className = 'fas fa-satellite text-gray-400';
-        }
+// Log work hours for fatigue management
+function logWorkHours() {
+    if (database && driverInfo) {
+        const workData = {
+            driverId: driverInfo.id,
+            totalWorkHours: driverInfo.totalWorkHours,
+            fatigueLevel: driverInfo.fatigueLevel,
+            shiftStart: driverInfo.workShiftStart,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            status: isTracking ? 'active_duty' : 'on_break'
+        };
+        
+        database.ref(`driver_fatigue_tracking/${driverInfo.id}`).push(workData)
+            .catch(error => {
+                console.warn('Failed to log work hours:', error);
+            });
     }
 }
+
+// Initialize engaging driver dashboard (no GPS tracking)
+function initializeEngagingDashboard() {
+    // Add engaging dashboard elements
+    const dashboardDiv = document.createElement('div');
+    dashboardDiv.className = 'bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-lg shadow-lg mb-4';
+    dashboardDiv.innerHTML = `
+        <h3 class="text-xl font-bold mb-4 flex items-center">
+            <i class="fas fa-tachometer-alt text-yellow-300 mr-3"></i>
+            Driver Dashboard
+        </h3>
+        
+        <!-- Quick Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white/20 backdrop-blur rounded-lg p-3 text-center">
+                <i class="fas fa-clock text-2xl text-yellow-300 mb-2"></i>
+                <div class="text-sm opacity-90">Work Hours</div>
+                <div class="text-lg font-bold" id="dashboardWorkHours">00:00</div>
+            </div>
+            <div class="bg-white/20 backdrop-blur rounded-lg p-3 text-center">
+                <i class="fas fa-user-check text-2xl text-green-300 mb-2"></i>
+                <div class="text-sm opacity-90">Status</div>
+                <div class="text-lg font-bold" id="dashboardStatus">Ready</div>
+            </div>
+            <div class="bg-white/20 backdrop-blur rounded-lg p-3 text-center">
+                <i class="fas fa-route text-2xl text-blue-300 mb-2"></i>
+                <div class="text-sm opacity-90">Trips Today</div>
+                <div class="text-lg font-bold" id="dashboardTrips">0</div>
+            </div>
+            <div class="bg-white/20 backdrop-blur rounded-lg p-3 text-center">
+                <i class="fas fa-star text-2xl text-orange-300 mb-2"></i>
+                <div class="text-sm opacity-90">Rating</div>
+                <div class="text-lg font-bold" id="dashboardRating">4.8</div>
+            </div>
+        </div>
+        
+        <!-- Driver Performance Card -->
+        <div class="bg-white/10 backdrop-blur rounded-lg p-4">
+            <h4 class="font-semibold mb-3 flex items-center">
+                <i class="fas fa-chart-line text-green-300 mr-2"></i>
+                Performance Overview
+            </h4>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <div class="text-sm opacity-90 mb-1">Safety Score</div>
+                    <div class="bg-white/20 rounded-full h-2 mb-1">
+                        <div class="bg-green-400 h-2 rounded-full" style="width: 95%"></div>
+                    </div>
+                    <div class="text-xs">95% - Excellent</div>
+                </div>
+                <div>
+                    <div class="text-sm opacity-90 mb-1">Punctuality</div>
+                    <div class="bg-white/20 rounded-full h-2 mb-1">
+                        <div class="bg-blue-400 h-2 rounded-full" style="width: 88%"></div>
+                    </div>
+                    <div class="text-xs">88% - Good</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert at the beginning of the dashboard
+    const driverDashboard = document.getElementById('driverDashboard');
+    const firstCard = driverDashboard.querySelector('.bg-gradient-to-r');
+    if (firstCard) {
+        driverDashboard.insertBefore(dashboardDiv, firstCard.nextSibling);
+    } else {
+        const firstSection = driverDashboard.querySelector('.bg-white');
+        driverDashboard.insertBefore(dashboardDiv, firstSection);
+    }
+    
+    // Add achievement notifications
+    addAchievementSystem();
+    
+    console.log('Engaging dashboard initialized');
+}
+
+// Add achievement and gamification system
+function addAchievementSystem() {
+    // Add achievements panel
+    const achievementsDiv = document.createElement('div');
+    achievementsDiv.className = 'bg-white p-4 rounded-lg shadow mb-4';
+    achievementsDiv.innerHTML = `
+        <h3 class="text-lg font-semibold mb-3 flex items-center">
+            <i class="fas fa-trophy text-yellow-500 mr-2"></i>
+            Achievements & Rewards
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="achievement-badge bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-3 rounded-lg text-center">
+                <i class="fas fa-shield-alt text-2xl mb-2"></i>
+                <div class="text-sm font-bold">Safety Champion</div>
+                <div class="text-xs opacity-90">30 days accident-free</div>
+            </div>
+            <div class="achievement-badge bg-gradient-to-r from-green-400 to-blue-500 text-white p-3 rounded-lg text-center">
+                <i class="fas fa-clock text-2xl mb-2"></i>
+                <div class="text-sm font-bold">Punctuality Pro</div>
+                <div class="text-xs opacity-90">95% on-time arrival</div>
+            </div>
+            <div class="achievement-badge bg-gradient-to-r from-purple-400 to-pink-500 text-white p-3 rounded-lg text-center">
+                <i class="fas fa-users text-2xl mb-2"></i>
+                <div class="text-sm font-bold">Passenger Favorite</div>
+                <div class="text-xs opacity-90">4.8+ rating</div>
+            </div>
+        </div>
+        
+        <!-- Progress towards next achievement -->
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium">Progress to "Speed Master"</span>
+                <span class="text-sm text-gray-600">7/10 efficient trips</span>
+            </div>
+            <div class="bg-gray-200 rounded-full h-2">
+                <div class="bg-blue-500 h-2 rounded-full" style="width: 70%"></div>
+            </div>
+        </div>
+    `;
+    
+    // Insert after the main dashboard
+    const driverDashboard = document.getElementById('driverDashboard');
+    const busAssignmentSection = driverDashboard.querySelector('.bg-white');
+    driverDashboard.insertBefore(achievementsDiv, busAssignmentSection);
+}
+
+
 
 function initializeDriverMap() {
     try {
@@ -509,38 +560,133 @@ function initializeDriverMap() {
     }
 }
 
+// Test function to debug route loading
+function testRouteLoading() {
+    console.log('=== ROUTE LOADING DEBUG ===');
+    console.log('PTTConfig exists:', typeof PTTConfig !== 'undefined');
+    
+    if (typeof PTTConfig !== 'undefined') {
+        console.log('PTTConfig.data exists:', typeof PTTConfig.data !== 'undefined');
+        
+        if (PTTConfig.data) {
+            console.log('PTTConfig.data.routes exists:', typeof PTTConfig.data.routes !== 'undefined');
+            
+            if (PTTConfig.data.routes) {
+                console.log('Available cities:', Object.keys(PTTConfig.data.routes));
+                
+                Object.keys(PTTConfig.data.routes).forEach(city => {
+                    const routes = PTTConfig.data.routes[city];
+                    console.log(`${city}:`, routes ? routes.length : 'No routes', 'routes');
+                    if (routes && routes.length > 0) {
+                        routes.forEach((route, index) => {
+                            console.log(`  ${index + 1}. ${route.name} (ID: ${route.id})`);
+                        });
+                    }
+                });
+            }
+        }
+    }
+    console.log('=== END DEBUG ===');
+}
+
+// Call test function when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(testRouteLoading, 1000);
+    });
+} else {
+    setTimeout(testRouteLoading, 1000);
+}
+
 function populateRoutes() {
     const city = document.getElementById('busCity').value;
     const routeSelect = document.getElementById('busRoute');
+    
+    // Clear and disable the route selection
     routeSelect.innerHTML = '<option value="">Choose route...</option>';
     routeSelect.disabled = true;
-
-    if (city && PTTConfig.data.routes[city]) {
-        PTTConfig.data.routes[city].forEach(route => {
+    
+    console.log('Selected city:', city);
+    console.log('PTTConfig.data:', PTTConfig.data);
+    console.log('Available routes data:', PTTConfig.data.routes);
+    
+    if (!city) {
+        console.log('No city selected');
+        return;
+    }
+    
+    // Check if PTTConfig and routes data exists
+    if (!PTTConfig || !PTTConfig.data || !PTTConfig.data.routes) {
+        console.error('PTTConfig.data.routes not available');
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification('Route data not loaded. Please refresh the page.', 'error');
+        }
+        return;
+    }
+    
+    const cityRoutes = PTTConfig.data.routes[city];
+    console.log('Routes for', city, ':', cityRoutes);
+    
+    if (cityRoutes && Array.isArray(cityRoutes) && cityRoutes.length > 0) {
+        cityRoutes.forEach((route, index) => {
+            console.log(`Adding route ${index + 1}:`, route);
             const option = document.createElement('option');
             option.value = route.id;
             option.textContent = route.name;
             routeSelect.appendChild(option);
         });
+        
         routeSelect.disabled = false;
+        
+        // Show success message
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification(`✅ ${cityRoutes.length} routes loaded for ${city}`, 'success');
+        }
+        
+        console.log(`Successfully loaded ${cityRoutes.length} routes for ${city}`);
+    } else {
+        console.log('No routes found for city:', city);
+        
+        // Add some default routes for testing if none exist
+        const defaultRoutes = {
+            chandigarh: [
+                { id: 'ch1', name: 'Route 1: Sector 17 to Sector 43' },
+                { id: 'ch2', name: 'Route 2: PGI to Railway Station' },
+                { id: 'ch3', name: 'Route 3: ISBT to University' }
+            ],
+            ludhiana: [
+                { id: 'ld1', name: 'Route 1: Bus Stand to PAU' },
+                { id: 'ld2', name: 'Route 2: Clock Tower to Mall Road' }
+            ],
+            amritsar: [
+                { id: 'am1', name: 'Route 1: Golden Temple to Airport' },
+                { id: 'am2', name: 'Route 2: Hall Gate to Railway Station' }
+            ]
+        };
+        
+        if (defaultRoutes[city]) {
+            console.log('Using default routes for', city);
+            defaultRoutes[city].forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.id;
+                option.textContent = route.name;
+                routeSelect.appendChild(option);
+            });
+            
+            routeSelect.disabled = false;
+            
+            if (typeof CommonUtils !== 'undefined') {
+                CommonUtils.showNotification(`📍 ${defaultRoutes[city].length} demo routes loaded for ${city}`, 'info');
+            }
+        } else {
+            if (typeof CommonUtils !== 'undefined') {
+                CommonUtils.showNotification('⚠️ No routes available for selected city', 'warning');
+            }
+        }
     }
 }
 
-function saveBusAssignment() {
-    const city = document.getElementById('busCity').value;
-    const busNumber = document.getElementById('busNumber').value;
-    const routeId = document.getElementById('busRoute').value;
 
-    if (!city || !busNumber || !routeId) {
-        alert('Please fill out all fields.');
-        return;
-    }
-
-    busAssignment = { city, busNumber, routeId };
-    alert('Bus assignment saved!');
-    document.getElementById('trackingBtn').disabled = false;
-    document.querySelector('#trackingStatus p').textContent = 'Ready to start tracking.';
-}
 
 function toggleTracking() {
     if (isTracking) {
@@ -560,217 +706,70 @@ function startTracking() {
         return;
     }
 
-    if (!navigator.geolocation) {
-        if (typeof CommonUtils !== 'undefined') {
-            CommonUtils.showNotification('Geolocation is not supported by your browser', 'error');
-        } else {
-            alert('Geolocation is not supported by your browser.');
-        }
-        return;
-    }
-
-    // Enhanced options for active bus tracking
-    const trackingOptions = {
-        enableHighAccuracy: true,
-        timeout: 25000, // 25 seconds timeout
-        maximumAge: 10000 // Allow cached position up to 10 seconds for active tracking
-    };
-
     // Show tracking start notification
     if (typeof CommonUtils !== 'undefined') {
-        CommonUtils.showNotification('Starting GPS tracking for bus service...', 'info');
+        CommonUtils.showNotification('Starting your service! Drive safe and have a great trip! 🚌✨', 'success');
     }
 
-    watchId = navigator.geolocation.watchPosition(
-        updateLocation, 
-        handleError, 
-        trackingOptions
-    );
-    
     isTracking = true;
     updateTrackingUI();
     
-    console.log('Active bus tracking started with watch ID:', watchId);
-}
-
-function stopTracking() {
-    navigator.geolocation.clearWatch(watchId);
-    isTracking = false;
-
-    // Set the bus to inactive in Firebase using device ID
-    if (busAssignment && deviceId) {
-        const busRef = database.ref(`live_buses/${busAssignment.routeId}/${deviceId}`);
-        busRef.update({ 
-            isActive: false,
-            lastDeactivated: firebase.database.ServerValue.TIMESTAMP
-        }).catch(error => {
-            console.warn('Failed to update bus status:', error);
-        });
-        
-        // Also update driver-device mapping
-        database.ref(`driver_active_devices/${driverInfo.id}`).update({
-            isActive: false,
-            lastDeactivated: firebase.database.ServerValue.TIMESTAMP
-        }).catch(error => {
-            console.warn('Failed to update driver-device mapping:', error);
-        });
-    }
+    // Update trip count
+    let todayTrips = parseInt(sessionStorage.getItem('todayTrips') || '0');
+    todayTrips++;
+    sessionStorage.setItem('todayTrips', todayTrips.toString());
     
-    updateTrackingUI();
-}
-
-function updateLocation(position) {
-    const { latitude, longitude, speed, accuracy } = position.coords;
-    const speedKmh = speed ? Math.round(speed * 3.6) : 0;
-
-    // Update UI
-    document.getElementById('currentSpeed').textContent = `${speedKmh} km/h`;
-    document.getElementById('speedDisplay').textContent = speedKmh;
+    // Update dashboard stats
+    updateDashboardStats();
     
-    // Update GPS status with current accuracy
-    updateGPSStatus(accuracy, 'active');
-
-    // Update map marker with bus icon when actively tracking
-    const latLng = [latitude, longitude];
-    
-    if (driverMarker) {
-        driverMarker.setLatLng(latLng);
-        // Update icon to bus when tracking
-        const busIcon = L.divIcon({ 
-            className: 'driver-marker-active', 
-            html: '<i class="fas fa-bus"></i>', 
-            iconSize: [35, 35],
-            iconAnchor: [17, 17]
-        });
-        driverMarker.setIcon(busIcon);
-        driverMarker.setPopupContent(`Bus: ${busAssignment.busNumber}<br>Driver: ${driverInfo.name}<br>Speed: ${speedKmh} km/h<br>Device: ${deviceId}`);
-    } else {
-        const busIcon = L.divIcon({ 
-            className: 'driver-marker-active', 
-            html: '<i class="fas fa-bus"></i>', 
-            iconSize: [35, 35],
-            iconAnchor: [17, 17]
-        });
-        driverMarker = L.marker(latLng, { icon: busIcon }).addTo(driverMap);
-        driverMarker.bindPopup(`Bus: ${busAssignment.busNumber}<br>Driver: ${driverInfo.name}<br>Speed: ${speedKmh} km/h<br>Device: ${deviceId}`);
-    }
-    
-    driverMap.setView(latLng, 16);
-
-    // Send data to Firebase only when actively tracking - using device ID as primary key
-    if (isTracking && busAssignment) {
-        const busData = {
-            deviceId: deviceId, // Primary identifier
+    // Log service start in Firebase
+    if (database && driverInfo && busAssignment) {
+        database.ref(`active_services/${driverInfo.id}`).set({
             driverId: driverInfo.id,
             driverName: driverInfo.name,
             busNumber: busAssignment.busNumber,
             routeId: busAssignment.routeId,
             city: busAssignment.city,
-            latitude: latitude,
-            longitude: longitude,
-            speed: speedKmh,
-            accuracy: Math.round(accuracy),
-            timestamp: firebase.database.ServerValue.TIMESTAMP,
-            isActive: true,
-            lastUpdated: new Date().toISOString(),
-            deviceInfo: {
-                userAgent: navigator.userAgent.substring(0, 50), // Truncate for storage
-                platform: navigator.platform,
-                online: navigator.onLine
-            }
-        };
-        
-        // Store by device ID instead of driver ID for better tracking
-        const busRef = database.ref(`live_buses/${busAssignment.routeId}/${deviceId}`);
-        busRef.set(busData).catch(error => {
-            console.error('Error updating bus location:', error);
-            if (typeof CommonUtils !== 'undefined') {
-                CommonUtils.showNotification('Failed to update location', 'error');
-            }
-        });
-        
-        // Also maintain driver-device mapping
-        database.ref(`driver_active_devices/${driverInfo.id}`).set({
-            deviceId: deviceId,
-            busNumber: busAssignment.busNumber,
-            routeId: busAssignment.routeId,
-            lastUpdate: firebase.database.ServerValue.TIMESTAMP
+            serviceStarted: firebase.database.ServerValue.TIMESTAMP,
+            status: 'active',
+            tripNumber: todayTrips
         }).catch(error => {
-            console.warn('Failed to update driver-device mapping:', error);
+            console.warn('Failed to log service start:', error);
         });
     }
+    
+    console.log('Service tracking started');
 }
 
-function handleError(error) {
-    console.error('GPS Error during active tracking:', error);
-    
-    let errorMessage = 'GPS Error';
-    let shouldStopTracking = false;
-    
-    switch(error.code) {
-        case error.PERMISSION_DENIED:
-            errorMessage = 'GPS permission denied. Please enable location access and restart tracking.';
-            shouldStopTracking = true;
-            break;
-        case error.POSITION_UNAVAILABLE:
-            errorMessage = 'GPS position unavailable. Please check your device GPS settings.';
-            // Don't stop tracking, might recover
-            break;
-        case error.TIMEOUT:
-            errorMessage = 'GPS timeout. Trying again with extended timeout...';
-            // Try to restart with more lenient settings
-            restartTrackingWithLenientSettings();
-            return; // Don't stop tracking, we're restarting
-        default:
-            errorMessage = `GPS Error: ${error.message}`;
+function stopTracking() {
+    isTracking = false;
+
+    // Log service end in Firebase
+    if (database && driverInfo) {
+        database.ref(`active_services/${driverInfo.id}`).update({
+            serviceEnded: firebase.database.ServerValue.TIMESTAMP,
+            status: 'completed'
+        }).catch(error => {
+            console.warn('Failed to log service end:', error);
+        });
     }
     
-    // Show user-friendly error message
+    updateTrackingUI();
+    updateDashboardStats();
+    
     if (typeof CommonUtils !== 'undefined') {
-        CommonUtils.showNotification(errorMessage, 'error', 6000);
-    } else {
-        alert(errorMessage);
+        CommonUtils.showNotification('Service completed! Great job! 🎉', 'success');
     }
     
-    if (shouldStopTracking) {
-        stopTracking();
-    }
+    // Show completion message after a delay
+    setTimeout(() => {
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification('Take a moment to rest before your next trip 😌', 'info');
+        }
+    }, 3000);
 }
 
-// Restart tracking with more lenient GPS settings
-function restartTrackingWithLenientSettings() {
-    if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-    }
-    
-    console.log('Restarting GPS tracking with lenient settings...');
-    
-    const lenientOptions = {
-        enableHighAccuracy: false, // Use less accurate but more reliable mode
-        timeout: 45000, // Longer timeout
-        maximumAge: 120000 // Allow older cached positions
-    };
-    
-    watchId = navigator.geolocation.watchPosition(
-        updateLocation, 
-        (error) => {
-            console.error('Lenient GPS tracking also failed:', error);
-            
-            if (typeof CommonUtils !== 'undefined') {
-                CommonUtils.showNotification('GPS tracking failed. Please check your device location settings.', 'error');
-            } else {
-                alert('GPS tracking failed. Please check your device location settings.');
-            }
-            
-            stopTracking();
-        }, 
-        lenientOptions
-    );
-    
-    if (typeof CommonUtils !== 'undefined') {
-        CommonUtils.showNotification('GPS restarted with extended timeout...', 'info');
-    }
-}
+
 
 function updateTrackingUI() {
     const btn = document.getElementById('trackingBtn');
@@ -924,15 +923,35 @@ function toggleMapView() {
 function logout() {
     if (isTracking) stopTracking();
     
-    // Stop driver location tracking
-    if (driverLocationWatchId) {
-        navigator.geolocation.clearWatch(driverLocationWatchId);
-        driverLocationWatchId = null;
+    // Log work session end for fatigue management
+    if (database && driverInfo) {
+        const sessionEnd = Date.now();
+        const totalSessionHours = (sessionEnd - driverInfo.workShiftStart) / (1000 * 60 * 60);
+        
+        database.ref(`driver_work_sessions/${driverInfo.id}/${driverInfo.workShiftStart}`).update({
+            sessionEnd: firebase.database.ServerValue.TIMESTAMP,
+            totalHours: totalSessionHours,
+            fatigueLevel: driverInfo.fatigueLevel,
+            status: 'logged_out'
+        }).catch(error => {
+            console.warn('Failed to log session end:', error);
+        });
+        
+        // Update driver status
+        database.ref(`drivers_status/${driverInfo.id}`).update({
+            status: 'logged_out',
+            lastLogout: firebase.database.ServerValue.TIMESTAMP,
+            totalSessionHours: totalSessionHours
+        }).catch(error => {
+            console.warn('Failed to update driver status:', error);
+        });
     }
     
     // Clear session data
     sessionStorage.removeItem('driverInfo');
-    CommonUtils.clearSession('driverLocation');
+    if (typeof CommonUtils !== 'undefined') {
+        CommonUtils.clearSession('driverLocation');
+    }
     
     // Reset variables
     driverInfo = null;
@@ -945,5 +964,7 @@ function logout() {
     }
     
     showLogin();
-    CommonUtils.showNotification('Logged out successfully', 'info');
+    if (typeof CommonUtils !== 'undefined') {
+        CommonUtils.showNotification('Work shift ended. Logged out successfully', 'info');
+    }
 }

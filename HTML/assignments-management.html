@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver-Vehicle Assignments - Punjab Transport Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .main-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; 
+                          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); margin: 20px auto; max-width: 1400px; padding: 30px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e9ecef; padding: 12px 15px; }
+        .btn-dark { background: linear-gradient(45deg, #495057, #6c757d); border: none; border-radius: 10px; 
+                    padding: 12px 30px; font-weight: 600; }
+        .table thead th { background: #495057; color: white; border: none; font-weight: 600; }
+        .status-active { background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-completed { background: #d1ecf1; color: #0c5460; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-cancelled { background: #f8d7da; color: #721c24; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .assignment-card { border-left: 4px solid #6c757d; }
+        .info-box { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="fas fa-link text-secondary"></i> Driver-Vehicle Assignments</h2>
+                <div>
+                    <button class="btn btn-outline-primary me-2" onclick="goToDriverManagement()">
+                        <i class="fas fa-user-tie"></i> Drivers
+                    </button>
+                    <button class="btn btn-outline-success me-2" onclick="goToVehicleManagement()">
+                        <i class="fas fa-bus"></i> Vehicles
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="goBack()">
+                        <i class="fas fa-arrow-left"></i> Dashboard
+                    </button>
+                </div>
+            </div>
+
+            <!-- Information Box -->
+            <div class="info-box">
+                <h5><i class="fas fa-info-circle text-primary"></i> What are Driver-Vehicle Assignments?</h5>
+                <p class="mb-0">
+                    <strong>Assignments</strong> pair drivers with specific vehicles for their work duties. This system helps track:
+                    <span class="badge bg-primary ms-2">Who drives what vehicle</span>
+                    <span class="badge bg-success ms-1">Which routes are covered</span>
+                    <span class="badge bg-warning ms-1">Shift schedules</span>
+                    <span class="badge bg-info ms-1">Vehicle utilization</span>
+                </p>
+            </div>
+
+            <div class="row">
+                <!-- Create Assignment Form -->
+                <div class="col-lg-4">
+                    <div class="card assignment-card">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Create New Assignment</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="createAssignmentForm">
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-user-tie"></i> Select Driver *</label>
+                                    <select class="form-select" id="assignmentDriver" required>
+                                        <option value="">Choose Driver</option>
+                                    </select>
+                                    <small class="text-muted">Only available drivers are shown</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-bus"></i> Select Vehicle *</label>
+                                    <select class="form-select" id="assignmentVehicle" required>
+                                        <option value="">Choose Vehicle</option>
+                                    </select>
+                                    <small class="text-muted">Only available vehicles are shown</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-route"></i> Route Information *</label>
+                                    <input type="text" class="form-control" id="assignmentRoute" 
+                                           placeholder="e.g., Chandigarh to Ludhiana" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-map-marked-alt"></i> Route Details</label>
+                                    <textarea class="form-control" id="routeDetails" rows="2" 
+                                              placeholder="Major stops, landmarks, etc."></textarea>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="fas fa-calendar-start"></i> Start Date *</label>
+                                        <input type="date" class="form-control" id="assignmentStartDate" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="fas fa-calendar-times"></i> End Date</label>
+                                        <input type="date" class="form-control" id="assignmentEndDate">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-clock"></i> Shift Timings *</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <input type="time" class="form-control" id="shiftStartTime" required>
+                                            <small class="text-muted">Start Time</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="time" class="form-control" id="shiftEndTime" required>
+                                            <small class="text-muted">End Time</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-tag"></i> Assignment Type</label>
+                                    <select class="form-select" id="assignmentType">
+                                        <option value="regular">Regular Service</option>
+                                        <option value="express">Express Service</option>
+                                        <option value="charter">Charter Service</option>
+                                        <option value="emergency">Emergency Service</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-sticky-note"></i> Notes</label>
+                                    <textarea class="form-control" id="assignmentNotes" rows="2" 
+                                              placeholder="Special instructions, requirements, etc."></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-dark w-100">
+                                    <i class="fas fa-link"></i> Create Assignment
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assignments List -->
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-tasks"></i> Current Assignments</h5>
+                            <div>
+                                <button class="btn btn-light btn-sm me-2" onclick="refreshAssignments()">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                                <button class="btn btn-warning btn-sm" onclick="showAssignmentStats()">
+                                    <i class="fas fa-chart-pie"></i> Stats
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Assignment ID</th>
+                                            <th>Driver</th>
+                                            <th>Vehicle</th>
+                                            <th>Route</th>
+                                            <th>Schedule</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="assignmentsTableBody">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted">
+                                                <i class="fas fa-spinner fa-spin"></i> Loading assignments...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h3 class="text-primary" id="totalAssignments">0</h3>
+                                    <small class="text-muted">Total Assignments</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h3 class="text-success" id="activeAssignments">0</h3>
+                                    <small class="text-muted">Active Now</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h3 class="text-warning" id="availableDrivers">0</h3>
+                                    <small class="text-muted">Available Drivers</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h3 class="text-info" id="availableVehicles">0</h3>
+                                    <small class="text-muted">Available Vehicles</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Details Modal -->
+    <div class="modal fade" id="assignmentDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-link"></i> Assignment Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="assignmentDetailsContent">
+                    <!-- Assignment details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="alertToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let assignmentManager;
+        let driverData = new Map();
+        let vehicleData = new Map();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAssignmentManager();
+            loadExternalData();
+            loadAssignmentData();
+            setupEventListeners();
+            updateStats();
+        });
+        
+        function initializeAssignmentManager() {
+            assignmentManager = {
+                assignments: new Map(),
+                
+                createAssignment: function(assignmentData) {
+                    const assignmentId = 'ASG' + Date.now().toString().slice(-6);
+                    const assignment = {
+                        assignmentId: assignmentId,
+                        driverId: assignmentData.driverId,
+                        vehicleId: assignmentData.vehicleId,
+                        route: assignmentData.route,
+                        routeDetails: assignmentData.routeDetails,
+                        startDate: assignmentData.startDate,
+                        endDate: assignmentData.endDate,
+                        shiftTiming: {
+                            startTime: assignmentData.startTime,
+                            endTime: assignmentData.endTime
+                        },
+                        assignmentType: assignmentData.assignmentType,
+                        notes: assignmentData.notes,
+                        status: 'active',
+                        createdDate: new Date().toISOString().split('T')[0],
+                        createdTime: new Date().toTimeString().split(' ')[0]
+                    };
+                    
+                    this.assignments.set(assignmentId, assignment);
+                    this.saveToLocalStorage();
+                    
+                    // Update driver and vehicle status
+                    this.updateDriverVehicleStatus(assignmentData.driverId, assignmentData.vehicleId, 'assigned');
+                    
+                    return { success: true, assignmentId: assignmentId };
+                },
+                
+                endAssignment: function(assignmentId) {
+                    const assignment = this.assignments.get(assignmentId);
+                    if (assignment) {
+                        assignment.status = 'completed';
+                        assignment.endedDate = new Date().toISOString().split('T')[0];
+                        
+                        // Free up driver and vehicle
+                        this.updateDriverVehicleStatus(assignment.driverId, assignment.vehicleId, 'available');
+                        this.saveToLocalStorage();
+                        return true;
+                    }
+                    return false;
+                },
+                
+                updateDriverVehicleStatus: function(driverId, vehicleId, status) {
+                    // This would update the status in the respective systems
+                    // For now, we'll just log it
+                    console.log(`Updated Driver ${driverId} and Vehicle ${vehicleId} status to: ${status}`);
+                },
+                
+                loadFromLocalStorage: function() {
+                    const saved = localStorage.getItem('punjabTransportAssignments');
+                    if (saved) {
+                        const assignmentsArray = JSON.parse(saved);
+                        assignmentsArray.forEach(assignment => {
+                            this.assignments.set(assignment.assignmentId, assignment);
+                        });
+                    }
+                },
+                
+                saveToLocalStorage: function() {
+                    const assignmentsArray = Array.from(this.assignments.values());
+                    localStorage.setItem('punjabTransportAssignments', JSON.stringify(assignmentsArray));
+                }
+            };
+            
+            // Load existing data
+            assignmentManager.loadFromLocalStorage();
+            
+            // Add sample assignment if empty
+            if (assignmentManager.assignments.size === 0) {
+                addSampleAssignment();
+            }
+        }
+        
+        function loadExternalData() {
+            // Load drivers from driver management
+            const savedDrivers = localStorage.getItem('punjabTransportDrivers');
+            if (savedDrivers) {
+                const driversArray = JSON.parse(savedDrivers);
+                driversArray.forEach(driver => {
+                    driverData.set(driver.driverId, driver);
+                });
+            }
+            
+            // Load vehicles from vehicle management
+            const savedVehicles = localStorage.getItem('punjabTransportVehicles');
+            if (savedVehicles) {
+                const vehiclesArray = JSON.parse(savedVehicles);
+                vehiclesArray.forEach(vehicle => {
+                    vehicleData.set(vehicle.vehicleId, vehicle);
+                });
+            }
+            
+            // Populate dropdowns
+            populateDropdowns();
+        }
+        
+        function populateDropdowns() {
+            const driverSelect = document.getElementById('assignmentDriver');
+            const vehicleSelect = document.getElementById('assignmentVehicle');
+            
+            // Get available drivers (not currently assigned)
+            const availableDrivers = Array.from(driverData.values()).filter(d => 
+                d.status === 'active' && !isDriverAssigned(d.driverId)
+            );
+            
+            // Get available vehicles (not currently assigned)
+            const availableVehicles = Array.from(vehicleData.values()).filter(v => 
+                v.status === 'available' && !isVehicleAssigned(v.vehicleId)
+            );
+            
+            driverSelect.innerHTML = '<option value="">Choose Driver</option>' + 
+                availableDrivers.map(driver => 
+                    `<option value="${driver.driverId}">${driver.personalInfo.firstName} ${driver.personalInfo.lastName} (${driver.driverId})</option>`
+                ).join('');
+                
+            vehicleSelect.innerHTML = '<option value="">Choose Vehicle</option>' + 
+                availableVehicles.map(vehicle => 
+                    `<option value="${vehicle.vehicleId}">${vehicle.registrationNumber} - ${vehicle.specifications.type} (${vehicle.specifications.seatingCapacity} seats)</option>`
+                ).join('');
+        }
+        
+        function isDriverAssigned(driverId) {
+            return Array.from(assignmentManager.assignments.values()).some(a => 
+                a.driverId === driverId && a.status === 'active'
+            );
+        }
+        
+        function isVehicleAssigned(vehicleId) {
+            return Array.from(assignmentManager.assignments.values()).some(a => 
+                a.vehicleId === vehicleId && a.status === 'active'
+            );
+        }
+        
+        function addSampleAssignment() {
+            // Only add if we have data
+            if (driverData.size > 0 && vehicleData.size > 0) {
+                const firstDriver = Array.from(driverData.values())[0];
+                const firstVehicle = Array.from(vehicleData.values())[0];
+                
+                const sampleAssignment = {
+                    driverId: firstDriver.driverId,
+                    vehicleId: firstVehicle.vehicleId,
+                    route: 'Chandigarh to Ludhiana Express',
+                    routeDetails: 'Via GT Road, stops at major bus stations',
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: '',
+                    startTime: '06:00',
+                    endTime: '18:00',
+                    assignmentType: 'express',
+                    notes: 'Sample assignment for demonstration'
+                };
+                
+                assignmentManager.createAssignment(sampleAssignment);
+            }
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('createAssignmentForm').addEventListener('submit', handleAssignmentSubmit);
+            
+            // Set default date to today
+            document.getElementById('assignmentStartDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        async function handleAssignmentSubmit(e) {
+            e.preventDefault();
+            try {
+                const assignmentData = {
+                    driverId: document.getElementById('assignmentDriver').value,
+                    vehicleId: document.getElementById('assignmentVehicle').value,
+                    route: document.getElementById('assignmentRoute').value,
+                    routeDetails: document.getElementById('routeDetails').value,
+                    startDate: document.getElementById('assignmentStartDate').value,
+                    endDate: document.getElementById('assignmentEndDate').value,
+                    startTime: document.getElementById('shiftStartTime').value,
+                    endTime: document.getElementById('shiftEndTime').value,
+                    assignmentType: document.getElementById('assignmentType').value,
+                    notes: document.getElementById('assignmentNotes').value
+                };
+                
+                const result = assignmentManager.createAssignment(assignmentData);
+                showToast('Success', 'Assignment created successfully!', 'success');
+                document.getElementById('createAssignmentForm').reset();
+                document.getElementById('assignmentStartDate').value = new Date().toISOString().split('T')[0];
+                
+                loadAssignmentList();
+                populateDropdowns(); // Refresh to remove assigned items
+                updateStats();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        function loadAssignmentData() {
+            loadAssignmentList();
+        }
+
+        function loadAssignmentList() {
+            const tbody = document.getElementById('assignmentsTableBody');
+            const assignments = Array.from(assignmentManager.assignments.values());
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No assignments created</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = assignments.map(assignment => {
+                const driver = driverData.get(assignment.driverId);
+                const vehicle = vehicleData.get(assignment.vehicleId);
+                
+                return `
+                    <tr>
+                        <td>${assignment.assignmentId}</td>
+                        <td>${driver ? `${driver.personalInfo.firstName} ${driver.personalInfo.lastName}` : 'Unknown Driver'}</td>
+                        <td>${vehicle ? vehicle.registrationNumber : 'Unknown Vehicle'}</td>
+                        <td>${assignment.route}</td>
+                        <td>${assignment.shiftTiming.startTime} - ${assignment.shiftTiming.endTime}</td>
+                        <td><span class="status-${assignment.status}">${assignment.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="viewAssignment('${assignment.assignmentId}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${assignment.status === 'active' ? 
+                                `<button class="btn btn-sm btn-danger" onclick="endAssignment('${assignment.assignmentId}')">
+                                    <i class="fas fa-stop"></i>
+                                </button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function updateStats() {
+            const assignments = Array.from(assignmentManager.assignments.values());
+            const activeAssignments = assignments.filter(a => a.status === 'active');
+            
+            const availableDriversCount = Array.from(driverData.values()).filter(d => 
+                d.status === 'active' && !isDriverAssigned(d.driverId)
+            ).length;
+            
+            const availableVehiclesCount = Array.from(vehicleData.values()).filter(v => 
+                v.status === 'available' && !isVehicleAssigned(v.vehicleId)
+            ).length;
+            
+            document.getElementById('totalAssignments').textContent = assignments.length;
+            document.getElementById('activeAssignments').textContent = activeAssignments.length;
+            document.getElementById('availableDrivers').textContent = availableDriversCount;
+            document.getElementById('availableVehicles').textContent = availableVehiclesCount;
+        }
+
+        function refreshAssignments() {
+            loadExternalData();
+            loadAssignmentList();
+            updateStats();
+            showToast('Success', 'Assignments refreshed!', 'success');
+        }
+
+        function viewAssignment(assignmentId) {
+            const assignment = assignmentManager.assignments.get(assignmentId);
+            if (!assignment) return;
+            
+            const driver = driverData.get(assignment.driverId);
+            const vehicle = vehicleData.get(assignment.vehicleId);
+            
+            const content = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Assignment Information</h6>
+                        <p><strong>Assignment ID:</strong> ${assignment.assignmentId}</p>
+                        <p><strong>Route:</strong> ${assignment.route}</p>
+                        <p><strong>Route Details:</strong> ${assignment.routeDetails || 'N/A'}</p>
+                        <p><strong>Type:</strong> ${assignment.assignmentType}</p>
+                        <p><strong>Status:</strong> <span class="status-${assignment.status}">${assignment.status}</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Schedule</h6>
+                        <p><strong>Start Date:</strong> ${assignment.startDate}</p>
+                        <p><strong>End Date:</strong> ${assignment.endDate || 'Ongoing'}</p>
+                        <p><strong>Shift Time:</strong> ${assignment.shiftTiming.startTime} - ${assignment.shiftTiming.endTime}</p>
+                        <p><strong>Created:</strong> ${assignment.createdDate} ${assignment.createdTime}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6>Driver Details</h6>
+                        <p><strong>Name:</strong> ${driver ? `${driver.personalInfo.firstName} ${driver.personalInfo.lastName}` : 'Unknown'}</p>
+                        <p><strong>Driver ID:</strong> ${assignment.driverId}</p>
+                        <p><strong>Mobile:</strong> ${driver ? driver.contactInfo.mobile : 'N/A'}</p>
+                        <p><strong>License:</strong> ${driver ? driver.licenseInfo.licenseNumber : 'N/A'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Vehicle Details</h6>
+                        <p><strong>Registration:</strong> ${vehicle ? vehicle.registrationNumber : 'Unknown'}</p>
+                        <p><strong>Vehicle ID:</strong> ${assignment.vehicleId}</p>
+                        <p><strong>Make/Model:</strong> ${vehicle ? `${vehicle.specifications.make} ${vehicle.specifications.model}` : 'N/A'}</p>
+                        <p><strong>Capacity:</strong> ${vehicle ? vehicle.specifications.seatingCapacity + ' seats' : 'N/A'}</p>
+                    </div>
+                </div>
+                ${assignment.notes ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Notes</h6>
+                        <p>${assignment.notes}</p>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            document.getElementById('assignmentDetailsContent').innerHTML = content;
+            new bootstrap.Modal(document.getElementById('assignmentDetailsModal')).show();
+        }
+
+        function endAssignment(assignmentId) {
+            if (confirm('Are you sure you want to end this assignment?')) {
+                const success = assignmentManager.endAssignment(assignmentId);
+                if (success) {
+                    showToast('Success', 'Assignment ended successfully!', 'success');
+                    loadAssignmentList();
+                    populateDropdowns();
+                    updateStats();
+                } else {
+                    showToast('Error', 'Failed to end assignment!', 'error');
+                }
+            }
+        }
+
+        function showAssignmentStats() {
+            showToast('Info', 'Detailed statistics feature coming soon!', 'info');
+        }
+
+        function showToast(title, message, type) {
+            const toast = document.getElementById('alertToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function goBack() {
+            window.location.href = 'admin-dashboard.html';
+        }
+        
+        function goToDriverManagement() {
+            window.location.href = 'driver-management.html';
+        }
+        
+        function goToVehicleManagement() {
+            window.location.href = 'vehicle-management.html';
+        }
+    </script>
+</body>
+</html>

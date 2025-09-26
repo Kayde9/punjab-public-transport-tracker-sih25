@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Management - Punjab Transport Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .main-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; 
+                          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); margin: 20px auto; max-width: 1400px; padding: 30px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e9ecef; padding: 12px 15px; }
+        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); border: none; border-radius: 10px; 
+                       padding: 12px 30px; font-weight: 600; }
+        .table thead th { background: #667eea; color: white; border: none; font-weight: 600; }
+        .status-active { background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-inactive { background: #f8d7da; color: #721c24; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-assigned { background: #cce5ff; color: #004085; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="fas fa-user-tie text-primary"></i> Driver Management System</h2>
+                <div>
+                    <button class="btn btn-outline-success me-2" onclick="goToVehicleManagement()">
+                        <i class="fas fa-bus"></i> Vehicle Management
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="goBack()">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Add New Driver Form -->
+                <div class="col-lg-5">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-user-plus"></i> Add New Driver</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="addDriverForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">First Name *</label>
+                                        <input type="text" class="form-control" id="driverFirstName" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Last Name *</label>
+                                        <input type="text" class="form-control" id="driverLastName" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Mobile Number *</label>
+                                    <input type="tel" class="form-control" id="driverMobile" pattern="[0-9]{10}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="driverEmail">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Date of Birth *</label>
+                                        <input type="date" class="form-control" id="driverDOB" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Gender *</label>
+                                        <select class="form-select" id="driverGender" required>
+                                            <option value="">Select Gender</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Address *</label>
+                                    <textarea class="form-control" id="driverAddress" rows="2" required></textarea>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">City *</label>
+                                        <select class="form-select" id="driverCity" required>
+                                            <option value="">Select City</option>
+                                            <option value="amritsar">Amritsar</option>
+                                            <option value="ludhiana">Ludhiana</option>
+                                            <option value="jalandhar">Jalandhar</option>
+                                            <option value="patiala">Patiala</option>
+                                            <option value="bathinda">Bathinda</option>
+                                            <option value="mohali">Mohali</option>
+                                            <option value="chandigarh">Chandigarh</option>
+                                            <option value="pathankot">Pathankot</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Pincode *</label>
+                                        <input type="text" class="form-control" id="driverPincode" pattern="[0-9]{6}" required>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">License Number *</label>
+                                        <input type="text" class="form-control" id="driverLicense" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">License Expiry *</label>
+                                        <input type="date" class="form-control" id="driverLicenseExpiry" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">License Categories *</label>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="licenseLight" value="LMV">
+                                                <label class="form-check-label" for="licenseLight">LMV</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="licenseMedium" value="MMV">
+                                                <label class="form-check-label" for="licenseMedium">MMV</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="licenseHeavy" value="HMV">
+                                                <label class="form-check-label" for="licenseHeavy">HMV</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Experience (years) *</label>
+                                    <input type="number" class="form-control" id="driverExperience" min="0" max="50" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Emergency Contact *</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" id="emergencyName" placeholder="Contact Name" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="tel" class="form-control" id="emergencyPhone" placeholder="Contact Number" pattern="[0-9]{10}" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-user-plus"></i> Register Driver
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Driver List -->
+                <div class="col-lg-7">
+                    <div class="card">
+                        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-users"></i> Registered Drivers</h5>
+                            <button class="btn btn-light btn-sm" onclick="refreshDriverList()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Driver ID</th>
+                                            <th>Name</th>
+                                            <th>Mobile</th>
+                                            <th>City</th>
+                                            <th>License</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="driversTableBody">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted">
+                                                <i class="fas fa-spinner fa-spin"></i> Loading drivers...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver Details Modal -->
+    <div class="modal fade" id="driverDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-user"></i> Driver Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="driverDetailsContent">
+                    <!-- Driver details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="alertToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let driverManager;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDriverManager();
+            loadDriverData();
+            setupEventListeners();
+        });
+        
+        function initializeDriverManager() {
+            driverManager = {
+                drivers: new Map(),
+                
+                registerDriver: function(driverData) {
+                    const driverId = 'DRV' + Date.now().toString().slice(-6);
+                    const driver = {
+                        driverId: driverId,
+                        personalInfo: driverData.personalInfo,
+                        contactInfo: driverData.contactInfo,
+                        licenseInfo: driverData.licenseInfo,
+                        experience: driverData.experience,
+                        emergencyContact: driverData.emergencyContact,
+                        status: 'active',
+                        registrationDate: new Date().toISOString().split('T')[0]
+                    };
+                    this.drivers.set(driverId, driver);
+                    this.saveToLocalStorage();
+                    return { success: true, driverId: driverId };
+                },
+                
+                loadFromLocalStorage: function() {
+                    const saved = localStorage.getItem('punjabTransportDrivers');
+                    if (saved) {
+                        const driversArray = JSON.parse(saved);
+                        driversArray.forEach(driver => {
+                            this.drivers.set(driver.driverId, driver);
+                        });
+                    }
+                },
+                
+                saveToLocalStorage: function() {
+                    const driversArray = Array.from(this.drivers.values());
+                    localStorage.setItem('punjabTransportDrivers', JSON.stringify(driversArray));
+                }
+            };
+            
+            // Load existing data
+            driverManager.loadFromLocalStorage();
+            
+            // Add sample data if empty
+            if (driverManager.drivers.size === 0) {
+                addSampleDrivers();
+            }
+        }
+        
+        function addSampleDrivers() {
+            const sampleDrivers = [
+                {
+                    personalInfo: { firstName: 'Rajesh', lastName: 'Singh', dateOfBirth: '1985-05-15', gender: 'male' },
+                    contactInfo: { mobile: '9876543210', email: 'rajesh@example.com', address: 'Sector 17, Chandigarh', city: 'chandigarh', pincode: '160017' },
+                    licenseInfo: { licenseNumber: 'PB0123456789', expiryDate: '2025-12-31', categories: ['LMV', 'HMV'] },
+                    experience: 8,
+                    emergencyContact: { name: 'Sunita Singh', phone: '9876543200' }
+                },
+                {
+                    personalInfo: { firstName: 'Preet', lastName: 'Kaur', dateOfBirth: '1990-03-20', gender: 'female' },
+                    contactInfo: { mobile: '9876543211', email: 'preet@example.com', address: 'Model Town, Ludhiana', city: 'ludhiana', pincode: '141002' },
+                    licenseInfo: { licenseNumber: 'PB0123456790', expiryDate: '2026-06-30', categories: ['LMV'] },
+                    experience: 5,
+                    emergencyContact: { name: 'Jasbir Singh', phone: '9876543201' }
+                }
+            ];
+            
+            sampleDrivers.forEach(driver => {
+                driverManager.registerDriver(driver);
+            });
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('addDriverForm').addEventListener('submit', handleDriverSubmit);
+        }
+
+        async function handleDriverSubmit(e) {
+            e.preventDefault();
+            try {
+                const licenseCategories = [];
+                if (document.getElementById('licenseLight').checked) licenseCategories.push('LMV');
+                if (document.getElementById('licenseMedium').checked) licenseCategories.push('MMV');
+                if (document.getElementById('licenseHeavy').checked) licenseCategories.push('HMV');
+                
+                const driverData = {
+                    personalInfo: {
+                        firstName: document.getElementById('driverFirstName').value,
+                        lastName: document.getElementById('driverLastName').value,
+                        dateOfBirth: document.getElementById('driverDOB').value,
+                        gender: document.getElementById('driverGender').value
+                    },
+                    contactInfo: {
+                        mobile: document.getElementById('driverMobile').value,
+                        email: document.getElementById('driverEmail').value,
+                        address: document.getElementById('driverAddress').value,
+                        city: document.getElementById('driverCity').value,
+                        pincode: document.getElementById('driverPincode').value
+                    },
+                    licenseInfo: {
+                        licenseNumber: document.getElementById('driverLicense').value,
+                        expiryDate: document.getElementById('driverLicenseExpiry').value,
+                        categories: licenseCategories
+                    },
+                    experience: parseInt(document.getElementById('driverExperience').value),
+                    emergencyContact: {
+                        name: document.getElementById('emergencyName').value,
+                        phone: document.getElementById('emergencyPhone').value
+                    }
+                };
+                
+                const result = driverManager.registerDriver(driverData);
+                showToast('Success', 'Driver registered successfully!', 'success');
+                document.getElementById('addDriverForm').reset();
+                loadDriverList();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        function loadDriverData() {
+            loadDriverList();
+        }
+
+        function loadDriverList() {
+            const tbody = document.getElementById('driversTableBody');
+            const drivers = Array.from(driverManager.drivers.values());
+            
+            if (drivers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No drivers registered</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = drivers.map(driver => `
+                <tr>
+                    <td>${driver.driverId}</td>
+                    <td>${driver.personalInfo.firstName} ${driver.personalInfo.lastName}</td>
+                    <td>${driver.contactInfo.mobile}</td>
+                    <td>${driver.contactInfo.city || 'N/A'}</td>
+                    <td>${driver.licenseInfo.licenseNumber}</td>
+                    <td><span class="status-${driver.status}">${driver.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewDriver('${driver.driverId}')">View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editDriver('${driver.driverId}')">Edit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function refreshDriverList() {
+            loadDriverList();
+            showToast('Success', 'Driver list refreshed!', 'success');
+        }
+
+        function viewDriver(driverId) {
+            const driver = driverManager.drivers.get(driverId);
+            if (!driver) return;
+            
+            const content = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Personal Information</h6>
+                        <p><strong>Name:</strong> ${driver.personalInfo.firstName} ${driver.personalInfo.lastName}</p>
+                        <p><strong>Date of Birth:</strong> ${driver.personalInfo.dateOfBirth}</p>
+                        <p><strong>Gender:</strong> ${driver.personalInfo.gender}</p>
+                        <p><strong>Experience:</strong> ${driver.experience} years</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Contact Information</h6>
+                        <p><strong>Mobile:</strong> ${driver.contactInfo.mobile}</p>
+                        <p><strong>Email:</strong> ${driver.contactInfo.email || 'N/A'}</p>
+                        <p><strong>Address:</strong> ${driver.contactInfo.address}</p>
+                        <p><strong>City:</strong> ${driver.contactInfo.city}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6>License Information</h6>
+                        <p><strong>License Number:</strong> ${driver.licenseInfo.licenseNumber}</p>
+                        <p><strong>Expiry Date:</strong> ${driver.licenseInfo.expiryDate}</p>
+                        <p><strong>Categories:</strong> ${driver.licenseInfo.categories.join(', ')}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Emergency Contact</h6>
+                        <p><strong>Name:</strong> ${driver.emergencyContact.name}</p>
+                        <p><strong>Phone:</strong> ${driver.emergencyContact.phone}</p>
+                        <p><strong>Registration Date:</strong> ${driver.registrationDate}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('driverDetailsContent').innerHTML = content;
+            new bootstrap.Modal(document.getElementById('driverDetailsModal')).show();
+        }
+
+        function editDriver(driverId) {
+            showToast('Info', 'Edit driver functionality coming soon!', 'info');
+        }
+
+        function showToast(title, message, type) {
+            const toast = document.getElementById('alertToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function goBack() {
+            window.location.href = 'admin-dashboard.html';
+        }
+        
+        function goToVehicleManagement() {
+            window.location.href = 'vehicle-management.html';
+        }
+    </script>
+</body>
+</html>

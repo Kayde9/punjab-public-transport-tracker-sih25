@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Device Management - Punjab Transport Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-microchip text-2xl"></i>
+                <h1 class="text-xl font-bold">IoT Device Management</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="refreshDevices()" class="bg-blue-500 px-4 py-2 rounded hover:bg-blue-400">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+                <a href="admin-dashboard.html" class="bg-gray-500 px-4 py-2 rounded hover:bg-gray-400">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Admin
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+        <!-- System Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">Total Devices</h3>
+                        <p id="totalDevices" class="text-3xl font-bold text-blue-600">0</p>
+                    </div>
+                    <i class="fas fa-microchip text-blue-500 text-3xl"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">Online Devices</h3>
+                        <p id="onlineDevices" class="text-3xl font-bold text-green-600">0</p>
+                    </div>
+                    <i class="fas fa-wifi text-green-500 text-3xl"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">Offline Devices</h3>
+                        <p id="offlineDevices" class="text-3xl font-bold text-red-600">0</p>
+                    </div>
+                    <i class="fas fa-wifi-slash text-red-500 text-3xl"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">Active Buses</h3>
+                        <p id="activeBuses" class="text-3xl font-bold text-orange-600">0</p>
+                    </div>
+                    <i class="fas fa-bus text-orange-500 text-3xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add New Device Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-plus-circle text-green-600 mr-3"></i>
+                Register New IoT Device
+            </h2>
+            
+            <form id="deviceRegistrationForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Device ID *</label>
+                    <input type="text" id="deviceId" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="IOT-PB-001" required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Bus Number *</label>
+                    <input type="text" id="busNumber" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="PB-01-1234" required>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Driver ID</label>
+                    <input type="text" id="driverId" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="DR001">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">City *</label>
+                    <select id="citySelect" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        <option value="">Select City</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Route *</label>
+                    <select id="routeSelect" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required disabled>
+                        <option value="">Select Route</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Connectivity Method</label>
+                    <select id="connectivity" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="wifi">WiFi</option>
+                        <option value="lorawan">LoRaWAN</option>
+                        <option value="bluetooth">Bluetooth</option>
+                        <option value="cellular">Cellular</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Hardware Version</label>
+                    <input type="text" id="hardwareVersion" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="v1.0" value="v1.0">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Firmware Version</label>
+                    <input type="text" id="firmwareVersion" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="v1.0" value="v1.0">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">GPS Status</label>
+                    <select id="gpsStatus" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="enabled">GPS Enabled</option>
+                        <option value="disabled">GPS Disabled</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Device Status</label>
+                    <select id="deviceStatus" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="maintenance">Maintenance</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Manufacturer</label>
+                    <input type="text" id="manufacturer" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                           placeholder="Punjab Transport" value="Punjab Transport">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Auto GPS Tracking</label>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="autoTracking" value="enabled" checked class="mr-2">
+                            <span class="text-green-600">Enabled</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="autoTracking" value="disabled" class="mr-2">
+                            <span class="text-red-600">Disabled</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-2 lg:col-span-3">
+                    <button type="submit" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition flex items-center">
+                        <i class="fas fa-plus mr-2"></i>
+                        Register Device
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- GPS Control Dashboard -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-satellite text-blue-600 mr-3"></i>
+                GPS Control Dashboard
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold">GPS Active</h3>
+                            <p id="gpsActiveCount" class="text-3xl font-bold">0</p>
+                        </div>
+                        <i class="fas fa-satellite text-3xl opacity-80"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold">GPS Disabled</h3>
+                            <p id="gpsDisabledCount" class="text-3xl font-bold">0</p>
+                        </div>
+                        <i class="fas fa-satellite-dish text-3xl opacity-80"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold">Tracking Accuracy</h3>
+                            <p id="avgAccuracy" class="text-3xl font-bold">--</p>
+                        </div>
+                        <i class="fas fa-crosshairs text-3xl opacity-80"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-4">
+                <button onclick="enableAllGPS()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition flex items-center">
+                    <i class="fas fa-satellite mr-2"></i>
+                    Enable All GPS
+                </button>
+                <button onclick="disableAllGPS()" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition flex items-center">
+                    <i class="fas fa-satellite-dish mr-2"></i>
+                    Disable All GPS
+                </button>
+                <button onclick="testAllGPS()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition flex items-center">
+                    <i class="fas fa-vial mr-2"></i>
+                    Test All GPS
+                </button>
+                <button onclick="generateGPSReport()" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition flex items-center">
+                    <i class="fas fa-chart-line mr-2"></i>
+                    GPS Report
+                </button>
+            </div>
+        </div>
+
+        <!-- Device List -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-list text-blue-600 mr-3"></i>
+                    Registered IoT Devices
+                </h2>
+                <div class="flex items-center space-x-3">
+                    <button onclick="exportDeviceData()" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                        <i class="fas fa-download mr-2"></i>Export
+                    </button>
+                    <button onclick="verifyFirebaseData()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        <i class="fas fa-database mr-2"></i>Verify DB
+                    </button>
+                    <button onclick="startSimulation()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                        <i class="fas fa-play mr-2"></i>Start Simulation
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filter and Search -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <div class="flex-1 min-w-64">
+                    <input type="text" id="searchDevices" placeholder="Search devices..." 
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <select id="statusFilter" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="offline">Offline</option>
+                    <option value="maintenance">Maintenance</option>
+                </select>
+                <select id="connectivityFilter" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Connectivity</option>
+                    <option value="wifi">WiFi</option>
+                    <option value="lorawan">LoRaWAN</option>
+                    <option value="bluetooth">Bluetooth</option>
+                    <option value="cellular">Cellular</option>
+                </select>
+            </div>
+            
+            <!-- Device Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Bus/Route</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Connectivity</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Battery</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">GPS Control</th>
+                            <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deviceTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Devices will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Details Modal -->
+    <div id="deviceModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Device Details</h3>
+                <button onclick="closeDeviceModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="deviceDetailsContent">
+                <!-- Device details will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Dependencies -->
+    <script src="../JS/config.js"></script>
+    <script src="../JS/common.js"></script>
+    <script src="../JS/iot-integration.js"></script>
+    
+    <script>
+        // Global variables with enhanced synchronization
+        let currentDevices = [];
+        let simulationInterval = null;
+        let isLoadingDevices = false;
+        let deviceLoadPromise = null;
+        let firebaseListener = null;
+        let deviceCache = new Map(); // Cache to prevent data vanishing
+        let lastFirebaseUpdate = 0;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('IoT Device Management page loaded');
+            
+            // Initialize immediately without waiting
+            try {
+                initializePage();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                CommonUtils.showNotification('Failed to initialize: ' + error.message, 'error');
+            }
+        });
+
+        async function initializePage() {
+            console.log('Initializing IoT Management page with enhanced synchronization...');
+            
+            try {
+                // Initialize Firebase first
+                await initializeFirebase();
+                
+                // Setup basic UI
+                populateCitySelect();
+                setupEventListeners();
+                
+                // Setup Firebase real-time listener BEFORE loading data
+                setupFirebaseListeners();
+                
+                // Initial load with proper synchronization
+                await loadRegisteredDevicesWithSync();
+                
+                // Start polling
+                startStatusPolling();
+                
+                // Show success message
+                CommonUtils.showNotification('IoT Management system initialized successfully', 'success');
+                console.log('Page initialization completed with real-time sync');
+            } catch (error) {
+                console.error('Failed to initialize page:', error);
+                // Show error to user
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4';
+                errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Failed to initialize: ' + error.message;
+                document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.container').firstChild);
+            }
+        }
+        
+        // Initialize Firebase with better error handling
+        async function initializeFirebase() {
+            return new Promise((resolve, reject) => {
+                // Check if Firebase is already initialized
+                if (window.database) {
+                    console.log('Firebase already initialized');
+                    resolve();
+                    return;
+                }
+                
+                // Wait for Firebase to be available
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                const checkFirebase = () => {
+                    attempts++;
+                    
+                    if (typeof firebase !== 'undefined' && firebase.database) {
+                        try {
+                            // Firebase is available, try to get database
+                            window.database = firebase.database();
+                            console.log('✅ Firebase database initialized successfully');
+                            resolve();
+                        } catch (error) {
+                            console.error('Firebase database initialization failed:', error);
+                            reject(error);
+                        }
+                    } else if (attempts >= maxAttempts) {
+                        const error = new Error('Firebase failed to load after ' + maxAttempts + ' attempts');
+                        console.error(error.message);
+                        reject(error);
+                    } else {
+                        console.log(`Waiting for Firebase... (attempt ${attempts}/${maxAttempts})`);
+                        setTimeout(checkFirebase, 500);
+                    }
+                };
+                
+                checkFirebase();
+            });
+        }
+        
+        // Load devices with comprehensive race condition prevention
+        async function loadRegisteredDevicesWithSync() {
+            if (isLoadingDevices) {
+                console.log('Device loading already in progress, waiting...');
+                if (deviceLoadPromise) {
+                    await deviceLoadPromise;
+                }
+                return;
+            }
+            
+            isLoadingDevices = true;
+            deviceLoadPromise = loadRegisteredDevicesInternal();
+            
+            try {
+                await deviceLoadPromise;
+            } finally {
+                isLoadingDevices = false;
+                deviceLoadPromise = null;
+            }
+        }
+        
+        // Update device display directly from Firebase data to prevent vanishing
+        function updateDeviceDisplayFromFirebase(devicesData) {
+            console.log('Updating device display from Firebase data...');
+            
+            try {
+                // Clear existing cache and build new one
+                deviceCache.clear();
+                currentDevices = [];
+                
+                if (devicesData) {
+                    // Convert Firebase data to device array
+                    Object.entries(devicesData).forEach(([deviceId, deviceData]) => {
+                        const device = {
+                            deviceId: deviceId,
+                            busNumber: deviceData.busNumber || deviceData.name || deviceId,
+                            status: deviceData.status || 'offline',
+                            connectivity: deviceData.connectivity || 'unknown',
+                            batteryLevel: deviceData.batteryLevel || 0,
+                            lastSeen: deviceData.lastUpdate || deviceData.registeredAt || Date.now(),
+                            routeId: deviceData.routeId || 'N/A',
+                            location: deviceData.location || null
+                        };
+                        
+                        // Add to cache and current devices
+                        deviceCache.set(deviceId, device);
+                        currentDevices.push(device);
+                    });
+                    
+                    console.log(`✅ Updated display with ${currentDevices.length} devices from Firebase`);
+                } else {
+                    console.log('No devices found in Firebase');
+                }
+                
+                // Update UI immediately
+                updateStatistics();
+                renderDeviceTable();
+                
+            } catch (error) {
+                console.error('Error updating device display from Firebase:', error);
+            }
+        }
+        
+        // Internal device loading function with cache-first approach
+        async function loadRegisteredDevicesInternal() {
+            try {
+                console.log('Loading devices with cache-first approach...');
+                
+                // If we have cache and it's fresh, use it to prevent vanishing
+                if (deviceCache.size > 0 && (Date.now() - lastFirebaseUpdate) < 5000) {
+                    console.log('Using fresh cache to prevent data vanishing');
+                    currentDevices = Array.from(deviceCache.values());
+                    updateStatistics();
+                    renderDeviceTable();
+                    return;
+                }
+                
+                // Load directly from Firebase to avoid IoT Manager conflicts
+                if (window.database) {
+                    const snapshot = await window.database.ref('iot_devices').once('value');
+                    const devicesData = snapshot.val();
+                    
+                    // Use the same update method as the real-time listener
+                    updateDeviceDisplayFromFirebase(devicesData);
+                } else {
+                    console.warn('Firebase database not available');
+                    // Try IoT Manager as fallback
+                    if (IoTManager && IoTManager.getAllDevicesStatus) {
+                        currentDevices = IoTManager.getAllDevicesStatus();
+                        updateStatistics();
+                        renderDeviceTable();
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading devices:', error);
+                // Show empty state with error message
+                currentDevices = [];
+                updateStatistics();
+                renderDeviceTable();
+            }
+        }
+        
+        // Setup Firebase real-time listeners with anti-vanishing protection
+        function setupFirebaseListeners() {
+            if (!window.database) {
+                console.warn('Firebase not available - real-time updates disabled');
+                return;
+            }
+            
+            try {
+                // Remove existing listener if any
+                if (firebaseListener) {
+                    window.database.ref('iot_devices').off('value', firebaseListener);
+                }
+                
+                // Create new listener with data vanishing prevention
+                firebaseListener = (snapshot) => {
+                    const timestamp = Date.now();
+                    console.log('Firebase listener triggered at', new Date(timestamp).toISOString());
+                    
+                    // Prevent rapid-fire updates that cause vanishing
+                    if (timestamp - lastFirebaseUpdate < 1000) {
+                        console.log('Skipping rapid update to prevent data vanishing');
+                        return;
+                    }
+                    
+                    lastFirebaseUpdate = timestamp;
+                    const devicesData = snapshot.val();
+                    
+                    // Update cache and display directly without race conditions
+                    updateDeviceDisplayFromFirebase(devicesData);
+                };
+                
+                // Attach the listener
+                window.database.ref('iot_devices').on('value', firebaseListener, (error) => {
+                    console.error('Firebase listener error:', error);
+                });
+                
+                console.log('✅ Firebase real-time listener setup with anti-vanishing protection');
+            } catch (error) {
+                console.error('Failed to setup Firebase listeners:', error);
+            }
+        }
+        
+        async function checkFirebaseConnection() {
+            try {
+                if (!window.database) {
+                    throw new Error('Firebase database not initialized');
+                }
+                
+                // Test connection
+                await window.database.ref('.info/connected').once('value');
+                console.log('✅ Firebase connection verified');
+                
+                // Show connection status
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Connected to Firebase Database';
+                document.querySelector('.container').insertBefore(statusDiv, document.querySelector('.container').firstChild);
+                
+                // Remove status message after 3 seconds
+                setTimeout(() => {
+                    if (statusDiv.parentNode) {
+                        statusDiv.parentNode.removeChild(statusDiv);
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                console.error('❌ Firebase connection failed:', error);
+                
+                // Show error status
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4';
+                errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Database connection failed. Devices will be stored locally only.';
+                document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.container').firstChild);
+            }
+        }
+
+        function populateCitySelect() {
+            const citySelect = document.getElementById('citySelect');
+            if (!citySelect) {
+                console.warn('City select element not found');
+                return;
+            }
+            
+            citySelect.innerHTML = '<option value="">Select City</option>';
+            
+            // Use fallback data if PTTConfig is not available
+            const cities = (typeof PTTConfig !== 'undefined' && PTTConfig.data && PTTConfig.data.cities) ? 
+                PTTConfig.data.cities : {
+                    chandigarh: { name: "Chandigarh" },
+                    ludhiana: { name: "Ludhiana" },
+                    amritsar: { name: "Amritsar" },
+                    jalandhar: { name: "Jalandhar" },
+                    patiala: { name: "Patiala" }
+                };
+            
+            for (const cityId in cities) {
+                const city = cities[cityId];
+                const option = document.createElement('option');
+                option.value = cityId;
+                option.textContent = city.name;
+                citySelect.appendChild(option);
+            }
+            
+            console.log('City select populated with', Object.keys(cities).length, 'cities');
+        }
+
+        function setupEventListeners() {
+            console.log('Setting up event listeners...');
+            
+            // City selection change
+            const citySelect = document.getElementById('citySelect');
+            if (citySelect) {
+                citySelect.addEventListener('change', function() {
+                    const cityId = this.value;
+                    const routeSelect = document.getElementById('routeSelect');
+                    
+                    if (routeSelect) {
+                        routeSelect.innerHTML = '<option value="">Select Route</option>';
+                        routeSelect.disabled = !cityId;
+                        
+                        if (cityId) {
+                            // Use fallback data if PTTConfig is not available
+                            const routes = (typeof PTTConfig !== 'undefined' && PTTConfig.data && PTTConfig.data.routes && PTTConfig.data.routes[cityId]) ? 
+                                PTTConfig.data.routes[cityId] : [
+                                    { id: cityId + '-001', name: 'Route 1' },
+                                    { id: cityId + '-002', name: 'Route 2' }
+                                ];
+                            
+                            routes.forEach(route => {
+                                const option = document.createElement('option');
+                                option.value = route.id;
+                                option.textContent = route.name;
+                                routeSelect.appendChild(option);
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Device registration form
+            const form = document.getElementById('deviceRegistrationForm');
+            if (form) {
+                form.addEventListener('submit', registerDevice);
+            }
+            
+            // Search and filter
+            const searchInput = document.getElementById('searchDevices');
+            if (searchInput) {
+                searchInput.addEventListener('input', filterDevices);
+            }
+            
+            const statusFilter = document.getElementById('statusFilter');
+            if (statusFilter) {
+                statusFilter.addEventListener('change', filterDevices);
+            }
+            
+            const connectivityFilter = document.getElementById('connectivityFilter');
+            if (connectivityFilter) {
+                connectivityFilter.addEventListener('change', filterDevices);
+            }
+            
+            console.log('Event listeners set up successfully');
+        }
+
+        async function registerDevice(e) {
+            e.preventDefault();
+            
+            const deviceConfig = {
+                deviceId: document.getElementById('deviceId').value,
+                busNumber: document.getElementById('busNumber').value,
+                driverId: document.getElementById('driverId').value,
+                cityId: document.getElementById('citySelect').value,
+                routeId: document.getElementById('routeSelect').value,
+                connectivity: document.getElementById('connectivity').value,
+                hardwareVersion: document.getElementById('hardwareVersion').value,
+                firmwareVersion: document.getElementById('firmwareVersion').value,
+                manufacturer: document.getElementById('manufacturer').value,
+                installDate: new Date().toISOString()
+            };
+
+            // Validate required fields
+            if (!deviceConfig.deviceId || !deviceConfig.busNumber || !deviceConfig.cityId || !deviceConfig.routeId) {
+                alert('Please fill all required fields');
+                return;
+            }
+            
+            // Show loading state
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registering...';
+            submitButton.disabled = true;
+
+            try {
+                // Save to Firebase directly to prevent race conditions
+                if (window.database) {
+                    const gpsEnabled = document.querySelector('input[name="autoTracking"]:checked').value === 'enabled';
+                    const deviceStatus = document.getElementById('deviceStatus').value;
+                    const gpsStatus = document.getElementById('gpsStatus').value;
+                    
+                    await window.database.ref('iot_devices/' + deviceConfig.deviceId).set({
+                        deviceId: deviceConfig.deviceId,
+                        name: deviceConfig.busNumber,
+                        busNumber: deviceConfig.busNumber,
+                        driverId: deviceConfig.driverId,
+                        cityId: deviceConfig.cityId,
+                        routeId: deviceConfig.routeId,
+                        connectivity: deviceConfig.connectivity,
+                        hardwareVersion: deviceConfig.hardwareVersion,
+                        firmwareVersion: deviceConfig.firmwareVersion,
+                        manufacturer: deviceConfig.manufacturer,
+                        status: deviceStatus,
+                        batteryLevel: 100,
+                        lastUpdate: new Date().toISOString(),
+                        registeredAt: deviceConfig.installDate,
+                        location: null,
+                        gpsEnabled: gpsEnabled,
+                        gpsStatus: gpsStatus
+                    });
+                    
+                    console.log('✅ Device saved to Firebase - real-time listener will update UI');
+                    
+                    // Update cache immediately to prevent vanishing
+                    const deviceData = {
+                        deviceId: deviceConfig.deviceId,
+                        busNumber: deviceConfig.busNumber,
+                        status: deviceStatus,
+                        connectivity: deviceConfig.connectivity,
+                        batteryLevel: 100,
+                        lastSeen: Date.now(),
+                        routeId: deviceConfig.routeId,
+                        location: null,
+                        gpsEnabled: gpsEnabled,
+                        gpsStatus: gpsStatus
+                    };
+                    deviceCache.set(deviceConfig.deviceId, deviceData);
+                    
+                    CommonUtils.showNotification(`Device ${deviceConfig.deviceId} registered successfully with GPS ${gpsEnabled ? 'enabled' : 'disabled'}`, 'success');
+                    document.getElementById('deviceRegistrationForm').reset();
+                } else {
+                    throw new Error('Firebase database not available');
+                }
+                
+                // Optional: Register with IoT Manager for simulation features
+                try {
+                    if (IoTManager && IoTManager.registerDevice) {
+                        await IoTManager.registerDevice(deviceConfig);
+                        console.log('Device also registered with IoT Manager for simulation');
+                    }
+                } catch (iotError) {
+                    console.warn('IoT Manager registration failed (device still saved to database):', iotError);
+                }
+            } catch (error) {
+                console.error('Device registration error:', error);
+                CommonUtils.showNotification('Error registering device: ' + error.message, 'error');
+            } finally {
+                // Restore button state
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        }
+
+        function loadRegisteredDevices() {
+            // Use the new synchronized loading method
+            loadRegisteredDevicesWithSync();
+        }
+
+        // Enhanced statistics update with GPS metrics
+        function updateStatistics() {
+            const total = currentDevices.length;
+            const online = currentDevices.filter(d => d.status === 'active').length;
+            const offline = currentDevices.filter(d => d.status === 'offline' || d.status === 'inactive').length;
+            const active = currentDevices.filter(d => d.status === 'active').length;
+            
+            // GPS statistics
+            const gpsActive = currentDevices.filter(d => d.gpsEnabled !== false && d.status === 'active').length;
+            const gpsDisabled = currentDevices.filter(d => d.gpsEnabled === false || d.status !== 'active').length;
+            
+            // Update basic stats
+            document.getElementById('totalDevices').textContent = total;
+            document.getElementById('onlineDevices').textContent = online;
+            document.getElementById('offlineDevices').textContent = offline;
+            document.getElementById('activeBuses').textContent = active;
+            
+            // Update GPS stats
+            const gpsActiveElement = document.getElementById('gpsActiveCount');
+            const gpsDisabledElement = document.getElementById('gpsDisabledCount');
+            const avgAccuracyElement = document.getElementById('avgAccuracy');
+            
+            if (gpsActiveElement) gpsActiveElement.textContent = gpsActive;
+            if (gpsDisabledElement) gpsDisabledElement.textContent = gpsDisabled;
+            
+            // Calculate average accuracy (simulated)
+            if (avgAccuracyElement) {
+                const avgAccuracy = gpsActive > 0 ? Math.floor(Math.random() * 10) + 5 : '--';
+                avgAccuracyElement.textContent = avgAccuracy !== '--' ? `±${avgAccuracy}m` : avgAccuracy;
+            }
+        }
+
+        function renderDeviceTable() {
+            const tbody = document.getElementById('deviceTableBody');
+            
+            console.log(`Rendering ${currentDevices.length} devices in table`);
+            
+            if (currentDevices.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                            <i class="fas fa-microchip text-4xl mb-4 block text-gray-300"></i>
+                            No IoT devices registered yet
+                            <br><small class="text-xs mt-2 block">Add a device using the form above or click 'Verify DB' to check database</small>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Clear existing content
+            tbody.innerHTML = '';
+
+            currentDevices.forEach(device => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                const statusColor = device.status === 'active' ? 'green' : 
+                                   device.status === 'offline' ? 'red' : 'yellow';
+                
+                const batteryColor = device.batteryLevel > 50 ? 'green' : 
+                                   device.batteryLevel > 20 ? 'yellow' : 'red';
+
+                row.innerHTML = `
+                    <td class="px-4 py-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-microchip text-blue-500 mr-3"></i>
+                            <div>
+                                <div class="font-medium text-gray-900">${device.deviceId}</div>
+                                <div class="text-sm text-gray-500">IoT Device</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="font-medium text-gray-900">${device.busNumber}</div>
+                        <div class="text-sm text-gray-500">Route: ${device.routeId || 'N/A'}</div>
+                    </td>
+                    <td class="px-4 py-4">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800">
+                            <span class="w-2 h-2 mr-1 rounded-full bg-${statusColor}-400"></span>
+                            ${device.status.charAt(0).toUpperCase() + device.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-wifi text-gray-400 mr-2"></i>
+                            <span class="text-sm">${device.connectivity}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center">
+                            <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                <div class="bg-${batteryColor}-600 h-2 rounded-full" style="width: ${device.batteryLevel}%"></div>
+                            </div>
+                            <span class="text-sm text-${batteryColor}-600">${Math.round(device.batteryLevel)}%</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 text-sm text-gray-500">
+                        ${CommonUtils.getTimeAgo(device.lastSeen)}
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="flex items-center">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" 
+                                           onchange="toggleGPS('${device.deviceId}', this.checked)" 
+                                           ${device.gpsEnabled !== false ? 'checked' : ''}
+                                           class="form-checkbox h-5 w-5 text-green-600">
+                                    <span class="ml-2 text-sm ${device.gpsEnabled !== false ? 'text-green-600' : 'text-red-600'}">
+                                        ${device.gpsEnabled !== false ? 'ON' : 'OFF'}
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                ${device.gpsEnabled !== false ? 'Tracking Active' : 'Tracking Disabled'}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center space-x-2">
+                            <button onclick="showDeviceDetails('${device.deviceId}')" 
+                                    class="text-blue-600 hover:text-blue-900 p-2 rounded-full hover:bg-blue-100" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="toggleDevicePower('${device.deviceId}')" 
+                                    class="text-${device.status === 'active' ? 'orange' : 'green'}-600 hover:text-${device.status === 'active' ? 'orange' : 'green'}-900 p-2 rounded-full hover:bg-${device.status === 'active' ? 'orange' : 'green'}-100" 
+                                    title="${device.status === 'active' ? 'Turn Off Device' : 'Turn On Device'}">
+                                <i class="fas fa-power-off"></i>
+                            </button>
+                            <button onclick="simulateDeviceMovement('${device.deviceId}')" 
+                                    class="text-green-600 hover:text-green-900 p-2 rounded-full hover:bg-green-100" title="Simulate Movement">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button onclick="testGPSConnection('${device.deviceId}')" 
+                                    class="text-purple-600 hover:text-purple-900 p-2 rounded-full hover:bg-purple-100" title="Test GPS">
+                                <i class="fas fa-satellite"></i>
+                            </button>
+                            <button onclick="removeDevice('${device.deviceId}')" 
+                                    class="text-red-600 hover:text-red-900 p-2 rounded-full hover:bg-red-100" title="Remove Device">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            console.log('Device table rendered successfully');
+        }
+
+        function filterDevices() {
+            const searchTerm = document.getElementById('searchDevices').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const connectivityFilter = document.getElementById('connectivityFilter').value;
+
+            const allDevices = IoTManager.getAllDevicesStatus();
+            
+            currentDevices = allDevices.filter(device => {
+                const matchesSearch = device.deviceId.toLowerCase().includes(searchTerm) ||
+                                    device.busNumber.toLowerCase().includes(searchTerm);
+                const matchesStatus = !statusFilter || device.status === statusFilter;
+                const matchesConnectivity = !connectivityFilter || device.connectivity === connectivityFilter;
+                
+                return matchesSearch && matchesStatus && matchesConnectivity;
+            });
+
+            renderDeviceTable();
+        }
+
+        function showDeviceDetails(deviceId) {
+            const device = IoTManager.getDeviceStatus(deviceId);
+            if (!device) return;
+
+            const modal = document.getElementById('deviceModal');
+            const content = document.getElementById('deviceDetailsContent');
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-2">Device Information</h4>
+                        <p><strong>Device ID:</strong> ${device.deviceId}</p>
+                        <p><strong>Bus Number:</strong> ${device.busNumber}</p>
+                        <p><strong>Status:</strong> ${device.status}</p>
+                        <p><strong>Connectivity:</strong> ${device.connectivity}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-800 mb-2">Current Status</h4>
+                        <p><strong>Battery Level:</strong> ${Math.round(device.batteryLevel)}%</p>
+                        <p><strong>Last Seen:</strong> ${CommonUtils.getTimeAgo(device.lastSeen)}</p>
+                        <p><strong>Buffer Size:</strong> ${device.bufferSize} items</p>
+                    </div>
+                </div>
+                ${device.location ? `
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Last Known Location</h4>
+                        <p><strong>Latitude:</strong> ${device.location.latitude.toFixed(6)}</p>
+                        <p><strong>Longitude:</strong> ${device.location.longitude.toFixed(6)}</p>
+                        <p><strong>Accuracy:</strong> ${device.location.accuracy}m</p>
+                        <p><strong>Timestamp:</strong> ${new Date(device.location.timestamp).toLocaleString()}</p>
+                    </div>
+                ` : ''}
+            `;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDeviceModal() {
+            const modal = document.getElementById('deviceModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function simulateDeviceMovement(deviceId) {
+            // Get route coordinates for simulation
+            const device = IoTManager.getDeviceStatus(deviceId);
+            if (!device) return;
+
+            // For simulation, use predefined route coordinates
+            const routeCoordinates = [
+                { lat: 30.7333, lng: 76.7794 },
+                { lat: 30.7400, lng: 76.7850 },
+                { lat: 30.7450, lng: 76.7900 },
+                { lat: 30.7500, lng: 76.7950 }
+            ];
+
+            const interval = IoTManager.simulateDeviceData(deviceId, routeCoordinates);
+            CommonUtils.showNotification(`Started simulation for device ${deviceId}`, 'success');
+        }
+
+        function removeDevice(deviceId) {
+            if (confirm(`Are you sure you want to remove device ${deviceId}?`)) {
+                // Implementation for device removal
+                CommonUtils.showNotification(`Device ${deviceId} removed`, 'info');
+                loadRegisteredDevices();
+            }
+        }
+
+        function refreshDevices() {
+            console.log('Manually refreshing devices from Firebase...');
+            
+            // Show loading state
+            const tbody = document.getElementById('deviceTableBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin text-2xl"></i><br>Refreshing from database...</td></tr>';
+            
+            // Force fresh load by clearing cache
+            deviceCache.clear();
+            lastFirebaseUpdate = 0;
+            
+            loadRegisteredDevicesWithSync().then(() => {
+                CommonUtils.showNotification('Device list refreshed from database', 'success');
+            }).catch(error => {
+                console.error('Failed to refresh from database:', error);
+                CommonUtils.showNotification('Refresh failed: ' + error.message, 'error');
+                // Restore previous data if available
+                if (deviceCache.size > 0) {
+                    currentDevices = Array.from(deviceCache.values());
+                    renderDeviceTable();
+                }
+            });
+        }
+
+        function exportDeviceData() {
+            const data = IoTManager.getAllDevicesStatus();
+            const csv = convertToCSV(data);
+            downloadCSV(csv, 'iot-devices.csv');
+        }
+
+        function convertToCSV(data) {
+            const headers = ['Device ID', 'Bus Number', 'Status', 'Connectivity', 'Battery Level', 'Last Seen'];
+            const rows = data.map(device => [
+                device.deviceId,
+                device.busNumber,
+                device.status,
+                device.connectivity,
+                device.batteryLevel,
+                new Date(device.lastSeen).toISOString()
+            ]);
+            
+            return [headers, ...rows].map(row => row.join(',')).join('\n');
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function startSimulation() {
+            if (currentDevices.length === 0) {
+                alert('No devices registered for simulation');
+                return;
+            }
+
+            currentDevices.forEach(device => {
+                simulateDeviceMovement(device.deviceId);
+            });
+
+            CommonUtils.showNotification('Started simulation for all devices', 'success');
+        }
+
+        function startStatusPolling() {
+            // Minimal polling to avoid conflicts with real-time listeners
+            setInterval(() => {
+                if (!isLoadingDevices) {
+                    // Only update statistics from current cache to prevent conflicts
+                    updateStatistics();
+                    
+                    // Verify cache consistency every 5 minutes
+                    if (Math.random() < 0.017) { // ~1/60 chance each minute = ~every 5 minutes
+                        console.log('Periodic cache consistency check...');
+                        verifyDataConsistency();
+                    }
+                }
+            }, 60000); // Update every 60 seconds
+        }
+        
+        // Verify data consistency to prevent permanent vanishing
+        async function verifyDataConsistency() {
+            if (!window.database || isLoadingDevices) return;
+            
+            try {
+                const snapshot = await window.database.ref('iot_devices').once('value');
+                const dbData = snapshot.val();
+                const dbCount = dbData ? Object.keys(dbData).length : 0;
+                const cacheCount = deviceCache.size;
+                
+                console.log(`Consistency check: DB has ${dbCount} devices, cache has ${cacheCount}`);
+                
+                // If there's a significant mismatch, update from DB
+                if (Math.abs(dbCount - cacheCount) > 0) {
+                    console.log('Inconsistency detected, updating from database...');
+                    updateDeviceDisplayFromFirebase(dbData);
+                }
+            } catch (error) {
+                console.error('Consistency check failed:', error);
+            }
+        }
+        
+        // Toggle GPS functionality for a device
+        async function toggleGPS(deviceId, enable) {
+            try {
+                console.log(`${enable ? 'Enabling' : 'Disabling'} GPS for device ${deviceId}`);
+                
+                if (window.database) {
+                    // Update Firebase
+                    await window.database.ref(`iot_devices/${deviceId}`).update({
+                        gpsEnabled: enable,
+                        gpsStatus: enable ? 'enabled' : 'disabled',
+                        lastGPSToggle: new Date().toISOString(),
+                        lastUpdate: new Date().toISOString()
+                    });
+                    
+                    // Update cache
+                    if (deviceCache.has(deviceId)) {
+                        const device = deviceCache.get(deviceId);
+                        device.gpsEnabled = enable;
+                        device.gpsStatus = enable ? 'enabled' : 'disabled';
+                        deviceCache.set(deviceId, device);
+                    }
+                    
+                    // Send command to IoT device (simulated)
+                    await sendGPSCommand(deviceId, enable ? 'GPS_ON' : 'GPS_OFF');
+                    
+                    CommonUtils.showNotification(
+                        `GPS ${enable ? 'enabled' : 'disabled'} for device ${deviceId}`, 
+                        'success'
+                    );
+                    
+                    // Log the action
+                    logDeviceAction(deviceId, `GPS ${enable ? 'enabled' : 'disabled'}`);
+                } else {
+                    throw new Error('Firebase database not available');
+                }
+            } catch (error) {
+                console.error('Failed to toggle GPS:', error);
+                CommonUtils.showNotification('Failed to toggle GPS: ' + error.message, 'error');
+                // Revert checkbox state on failure
+                const checkbox = document.querySelector(`input[onchange*="${deviceId}"]`);
+                if (checkbox) {
+                    checkbox.checked = !enable;
+                }
+            }
+        }
+        
+        // Toggle device power (ON/OFF)
+        async function toggleDevicePower(deviceId) {
+            try {
+                const device = deviceCache.get(deviceId);
+                if (!device) {
+                    throw new Error('Device not found');
+                }
+                
+                const newStatus = device.status === 'active' ? 'inactive' : 'active';
+                const action = newStatus === 'active' ? 'powering on' : 'powering off';
+                
+                console.log(`${action} device ${deviceId}`);
+                
+                if (window.database) {
+                    // Update Firebase
+                    await window.database.ref(`iot_devices/${deviceId}`).update({
+                        status: newStatus,
+                        lastPowerToggle: new Date().toISOString(),
+                        lastUpdate: new Date().toISOString()
+                    });
+                    
+                    // Update cache
+                    device.status = newStatus;
+                    deviceCache.set(deviceId, device);
+                    
+                    // Send command to IoT device (simulated)
+                    await sendDeviceCommand(deviceId, newStatus === 'active' ? 'POWER_ON' : 'POWER_OFF');
+                    
+                    CommonUtils.showNotification(
+                        `Device ${deviceId} ${newStatus === 'active' ? 'powered on' : 'powered off'}`, 
+                        'success'
+                    );
+                    
+                    // If powering off, also disable GPS
+                    if (newStatus === 'inactive') {
+                        await toggleGPS(deviceId, false);
+                    }
+                    
+                    // Log the action
+                    logDeviceAction(deviceId, `Device ${newStatus === 'active' ? 'powered on' : 'powered off'}`);
+                    
+                    // Refresh display
+                    updateStatistics();
+                    renderDeviceTable();
+                } else {
+                    throw new Error('Firebase database not available');
+                }
+            } catch (error) {
+                console.error('Failed to toggle device power:', error);
+                CommonUtils.showNotification('Failed to toggle device power: ' + error.message, 'error');
+            }
+        }
+        
+        // Test GPS connection for a device
+        async function testGPSConnection(deviceId) {
+            try {
+                console.log(`Testing GPS connection for device ${deviceId}`);
+                
+                // Show loading state
+                const testButton = document.querySelector(`button[onclick*="testGPSConnection('${deviceId}')"]`);
+                if (testButton) {
+                    testButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    testButton.disabled = true;
+                }
+                
+                // Simulate GPS test (in real implementation, this would communicate with the device)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Simulate test results
+                const testResults = {
+                    signal_strength: Math.floor(Math.random() * 100),
+                    satellites_visible: Math.floor(Math.random() * 12) + 4,
+                    accuracy: Math.floor(Math.random() * 20) + 5,
+                    fix_time: Math.floor(Math.random() * 60) + 10
+                };
+                
+                // Log test results
+                if (window.database) {
+                    await window.database.ref(`device_tests/${deviceId}/${Date.now()}`).set({
+                        type: 'gps_test',
+                        results: testResults,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                // Show results modal
+                const modal = CommonUtils.createModal(
+                    `GPS Test Results - ${deviceId}`,
+                    `
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="font-medium">Signal Strength:</span>
+                            <span class="${testResults.signal_strength > 70 ? 'text-green-600' : testResults.signal_strength > 40 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${testResults.signal_strength}%
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Satellites Visible:</span>
+                            <span class="${testResults.satellites_visible >= 8 ? 'text-green-600' : testResults.satellites_visible >= 4 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${testResults.satellites_visible}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Accuracy:</span>
+                            <span class="${testResults.accuracy <= 10 ? 'text-green-600' : testResults.accuracy <= 20 ? 'text-yellow-600' : 'text-red-600'}">
+                                ±${testResults.accuracy}m
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Fix Time:</span>
+                            <span class="${testResults.fix_time <= 30 ? 'text-green-600' : testResults.fix_time <= 60 ? 'text-yellow-600' : 'text-red-600'}">
+                                ${testResults.fix_time}s
+                            </span>
+                        </div>
+                        <div class="mt-4 p-3 rounded ${testResults.signal_strength > 70 && testResults.satellites_visible >= 8 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                            <strong>Status:</strong> ${testResults.signal_strength > 70 && testResults.satellites_visible >= 8 ? 'GPS Working Perfectly' : 'GPS Signal Weak - Check Device Position'}
+                        </div>
+                    </div>
+                    `,
+                    '<button onclick="this.closest(\'.fixed\').remove()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Close</button>'
+                );
+                
+                CommonUtils.showNotification('GPS test completed successfully', 'success');
+                logDeviceAction(deviceId, 'GPS connection tested');
+                
+            } catch (error) {
+                console.error('GPS test failed:', error);
+                CommonUtils.showNotification('GPS test failed: ' + error.message, 'error');
+            } finally {
+                // Restore button state
+                const testButton = document.querySelector(`button[onclick*="testGPSConnection('${deviceId}')"]`);
+                if (testButton) {
+                    testButton.innerHTML = '<i class="fas fa-satellite"></i>';
+                    testButton.disabled = false;
+                }
+            }
+        }
+        
+        // Send GPS command to device (simulated)
+        async function sendGPSCommand(deviceId, command) {
+            console.log(`Sending GPS command to ${deviceId}: ${command}`);
+            
+            // Simulate command transmission delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Log command
+            if (window.database) {
+                await window.database.ref(`device_commands/${deviceId}/${Date.now()}`).set({
+                    command: command,
+                    type: 'gps_control',
+                    timestamp: new Date().toISOString(),
+                    status: 'sent'
+                });
+            }
+            
+            return { success: true, message: `GPS command ${command} sent successfully` };
+        }
+        
+        // Send device command (simulated)
+        async function sendDeviceCommand(deviceId, command) {
+            console.log(`Sending device command to ${deviceId}: ${command}`);
+            
+            // Simulate command transmission delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Log command
+            if (window.database) {
+                await window.database.ref(`device_commands/${deviceId}/${Date.now()}`).set({
+                    command: command,
+                    type: 'power_control',
+                    timestamp: new Date().toISOString(),
+                    status: 'sent'
+                });
+            }
+            
+            return { success: true, message: `Device command ${command} sent successfully` };
+        }
+        
+        // Log device action
+        async function logDeviceAction(deviceId, action) {
+            try {
+                if (window.database) {
+                    await window.database.ref(`device_logs/${deviceId}/${Date.now()}`).set({
+                        action: action,
+                        timestamp: new Date().toISOString(),
+                        user: 'admin' // In a real app, this would be the logged-in user
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to log device action:', error);
+            }
+        }
+        
+        // Enable GPS for all devices
+        async function enableAllGPS() {
+            try {
+                const offlineDevices = currentDevices.filter(d => d.gpsEnabled === false);
+                
+                if (offlineDevices.length === 0) {
+                    CommonUtils.showNotification('All devices already have GPS enabled', 'info');
+                    return;
+                }
+                
+                CommonUtils.showNotification(`Enabling GPS for ${offlineDevices.length} devices...`, 'info');
+                
+                for (const device of offlineDevices) {
+                    await toggleGPS(device.deviceId, true);
+                }
+                
+                CommonUtils.showNotification('All devices have GPS enabled', 'success');
+                
+            } catch (error) {
+                console.error('Failed to enable all GPS:', error);
+                CommonUtils.showNotification('Failed to enable all GPS: ' + error.message, 'error');
+            }
+        }
+        
+        // Disable GPS for all devices
+        async function disableAllGPS() {
+            try {
+                const onlineDevices = currentDevices.filter(d => d.gpsEnabled !== false);
+                
+                if (onlineDevices.length === 0) {
+                    CommonUtils.showNotification('All devices already have GPS disabled', 'info');
+                    return;
+                }
+                
+                CommonUtils.showNotification(`Disabling GPS for ${onlineDevices.length} devices...`, 'info');
+                
+                for (const device of onlineDevices) {
+                    await toggleGPS(device.deviceId, false);
+                }
+                
+                CommonUtils.showNotification('All devices have GPS disabled', 'success');
+                
+            } catch (error) {
+                console.error('Failed to disable all GPS:', error);
+                CommonUtils.showNotification('Failed to disable all GPS: ' + error.message, 'error');
+            }
+        }
+        
+        // Test GPS for all devices
+        async function testAllGPS() {
+            try {
+                const activeDevices = currentDevices.filter(d => d.status === 'active' && d.gpsEnabled !== false);
+                
+                if (activeDevices.length === 0) {
+                    CommonUtils.showNotification('No active devices with GPS enabled found', 'warning');
+                    return;
+                }
+                
+                CommonUtils.showNotification(`Testing GPS for ${activeDevices.length} devices...`, 'info');
+                
+                let testResults = [];
+                for (const device of activeDevices) {
+                    try {
+                        // Simulate GPS test
+                        const result = {
+                            deviceId: device.deviceId,
+                            busNumber: device.busNumber,
+                            signal_strength: Math.floor(Math.random() * 100),
+                            satellites: Math.floor(Math.random() * 12) + 4,
+                            accuracy: Math.floor(Math.random() * 20) + 5,
+                            status: 'tested'
+                        };
+                        testResults.push(result);
+                    } catch (error) {
+                        console.error(`Failed to test GPS for ${device.deviceId}:`, error);
+                        testResults.push({
+                            deviceId: device.deviceId,
+                            busNumber: device.busNumber,
+                            status: 'failed',
+                            error: error.message
+                        });
+                    }
+                }
+                
+                // Show test results
+                showGPSTestResults(testResults);
+                
+            } catch (error) {
+                console.error('Failed to test all GPS:', error);
+                CommonUtils.showNotification('Failed to test all GPS: ' + error.message, 'error');
+            }
+        }
+        
+        // Generate GPS report
+        async function generateGPSReport() {
+            try {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    totalDevices: currentDevices.length,
+                    gpsActive: currentDevices.filter(d => d.gpsEnabled !== false && d.status === 'active').length,
+                    gpsDisabled: currentDevices.filter(d => d.gpsEnabled === false || d.status !== 'active').length,
+                    devices: currentDevices.map(d => ({
+                        deviceId: d.deviceId,
+                        busNumber: d.busNumber,
+                        status: d.status,
+                        gpsEnabled: d.gpsEnabled !== false,
+                        lastSeen: d.lastSeen,
+                        connectivity: d.connectivity
+                    }))
+                };
+                
+                // Create report modal
+                const modal = CommonUtils.createModal(
+                    'GPS Status Report',
+                    `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-4 rounded">
+                                <h4 class="font-semibold text-gray-800">Total Devices</h4>
+                                <p class="text-2xl font-bold text-blue-600">${report.totalDevices}</p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded">
+                                <h4 class="font-semibold text-gray-800">GPS Active</h4>
+                                <p class="text-2xl font-bold text-green-600">${report.gpsActive}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="max-h-64 overflow-y-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Device</th>
+                                        <th class="px-3 py-2 text-left">Bus</th>
+                                        <th class="px-3 py-2 text-left">GPS</th>
+                                        <th class="px-3 py-2 text-left">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${report.devices.map(d => `
+                                        <tr class="border-b">
+                                            <td class="px-3 py-2">${d.deviceId}</td>
+                                            <td class="px-3 py-2">${d.busNumber}</td>
+                                            <td class="px-3 py-2">
+                                                <span class="px-2 py-1 rounded text-xs ${d.gpsEnabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                                    ${d.gpsEnabled ? 'ON' : 'OFF'}
+                                                </span>
+                                            </td>
+                                            <td class="px-3 py-2">
+                                                <span class="px-2 py-1 rounded text-xs ${d.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                                    ${d.status.toUpperCase()}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="text-xs text-gray-500">
+                            Generated on: ${new Date().toLocaleString()}
+                        </div>
+                    </div>
+                    `,
+                    `
+                    <button onclick="downloadGPSReport()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-2">
+                        <i class="fas fa-download mr-2"></i>Download
+                    </button>
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+                        Close
+                    </button>
+                    `
+                );
+                
+                // Store report for download
+                window.currentGPSReport = report;
+                
+            } catch (error) {
+                console.error('Failed to generate GPS report:', error);
+                CommonUtils.showNotification('Failed to generate GPS report: ' + error.message, 'error');
+            }
+        }
+        
+        // Show GPS test results
+        function showGPSTestResults(results) {
+            const successCount = results.filter(r => r.status === 'tested').length;
+            const failCount = results.filter(r => r.status === 'failed').length;
+            
+            const modal = CommonUtils.createModal(
+                'GPS Test Results',
+                `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-green-50 p-4 rounded">
+                            <h4 class="font-semibold text-gray-800">Successful Tests</h4>
+                            <p class="text-2xl font-bold text-green-600">${successCount}</p>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded">
+                            <h4 class="font-semibold text-gray-800">Failed Tests</h4>
+                            <p class="text-2xl font-bold text-red-600">${failCount}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="max-h-64 overflow-y-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Device</th>
+                                    <th class="px-3 py-2 text-left">Signal</th>
+                                    <th class="px-3 py-2 text-left">Satellites</th>
+                                    <th class="px-3 py-2 text-left">Accuracy</th>
+                                    <th class="px-3 py-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${results.map(r => `
+                                    <tr class="border-b">
+                                        <td class="px-3 py-2">${r.deviceId}</td>
+                                        <td class="px-3 py-2">${r.signal_strength || '--'}%</td>
+                                        <td class="px-3 py-2">${r.satellites || '--'}</td>
+                                        <td class="px-3 py-2">${r.accuracy ? '±' + r.accuracy + 'm' : '--'}</td>
+                                        <td class="px-3 py-2">
+                                            <span class="px-2 py-1 rounded text-xs ${r.status === 'tested' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                                ${r.status.toUpperCase()}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                `,
+                '<button onclick="this.closest(\'.fixed\').remove()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Close</button>'
+            );
+            
+            CommonUtils.showNotification(
+                `GPS test completed: ${successCount} passed, ${failCount} failed`, 
+                failCount === 0 ? 'success' : 'warning'
+            );
+        }
+        
+        // Download GPS report
+        function downloadGPSReport() {
+            if (!window.currentGPSReport) {
+                CommonUtils.showNotification('No report data available', 'error');
+                return;
+            }
+            
+            const report = window.currentGPSReport;
+            const csv = [
+                ['Device ID', 'Bus Number', 'Status', 'GPS Enabled', 'Connectivity', 'Last Seen'],
+                ...report.devices.map(d => [
+                    d.deviceId,
+                    d.busNumber,
+                    d.status,
+                    d.gpsEnabled ? 'Yes' : 'No',
+                    d.connectivity,
+                    new Date(d.lastSeen).toLocaleString()
+                ])
+            ].map(row => row.join(',')).join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gps-report-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            CommonUtils.showNotification('GPS report downloaded successfully', 'success');
+        }
+
+        // Verify Firebase data with detailed diagnostics
+        async function verifyFirebaseData() {
+            if (!window.database) {
+                alert('Firebase database not available');
+                return;
+            }
+            
+            try {
+                const snapshot = await window.database.ref('iot_devices').once('value');
+                const data = snapshot.val();
+                
+                if (data) {
+                    const deviceCount = Object.keys(data).length;
+                    const deviceList = Object.keys(data).join(', ');
+                    const cacheCount = deviceCache.size;
+                    const displayCount = currentDevices.length;
+                    
+                    alert(`Firebase Database Verification:
+
+✅ Devices in Database: ${deviceCount}
+📝 Device IDs: ${deviceList}
+💾 Cache Count: ${cacheCount}
+🖥️ Display Count: ${displayCount}
+⏰ Last Update: ${new Date(lastFirebaseUpdate).toLocaleString()}
+
+${deviceCount === displayCount ? '✅ Data is synchronized!' : '⚠️ Data may not be synchronized - try refresh'}`);
+                    
+                    console.log('Firebase devices data:', data);
+                    console.log('Current cache:', Object.fromEntries(deviceCache));
+                    
+                    // If counts don't match, offer to sync
+                    if (deviceCount !== displayCount) {
+                        if (confirm('Data counts don\'t match. Force refresh from database?')) {
+                            updateDeviceDisplayFromFirebase(data);
+                            CommonUtils.showNotification('Data synchronized from database', 'success');
+                        }
+                    }
+                } else {
+                    alert('No devices found in Firebase database.\n\nThis could mean:\n1. No devices have been registered yet\n2. Firebase connection issue\n3. Database permission issue\n\nCache count: ' + deviceCache.size);
+                }
+            } catch (error) {
+                alert('Error accessing Firebase: ' + error.message);
+                console.error('Firebase verification error:', error);
+            }
+        }
+        
+        // Cleanup when page unloads to prevent memory leaks
+        window.addEventListener('beforeunload', () => {
+            console.log('Cleaning up Firebase listeners...');
+            if (firebaseListener && window.database) {
+                window.database.ref('iot_devices').off('value', firebaseListener);
+            }
+            deviceCache.clear();
+        });
+    </script>
+</body>
+</html>

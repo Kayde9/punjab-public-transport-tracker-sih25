@@ -38,6 +38,41 @@
             border-top: 8px solid #10b981;
         }
         
+        /* Vehicle marker for IoT tracking */
+        .vehicle-marker-iot {
+            background: #8b5cf6;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            position: relative;
+            animation: pulse-iot 2s infinite;
+        }
+        
+        .vehicle-marker-iot::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #8b5cf6;
+        }
+        
+        @keyframes pulse-iot {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+        
         /* New marker styles */
         .driver-marker-standby {
             background: #6b7280;
@@ -210,6 +245,9 @@
                                 <select id="busRoute" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" disabled>
                                     <option value="">Choose route...</option>
                                 </select>
+                                <button onclick="testRouteLoading()" class="mt-1 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded hover:bg-gray-300">
+                                    🔍 Debug Routes
+                                </button>
                             </div>
                             
                             <button onclick="saveBusAssignment()" class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition">
@@ -218,42 +256,48 @@
                         </div>
                     </div>
 
-                    <!-- Tracking Control Card -->
-                    <div class="bg-white border border-gray-200 p-6 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-4 text-gray-800">
-                            <i class="fas fa-satellite-dish mr-2"></i> GPS Tracking
+                    <!-- Service Control Card -->
+                    <div class="bg-gradient-to-r from-green-500 to-blue-600 text-white p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            <i class="fas fa-road mr-2 text-yellow-300"></i> Service Control
                         </h3>
                         
-                        <button id="trackingBtn" onclick="toggleTracking()" class="w-full bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition text-lg font-semibold mb-4" disabled>
-                            <i class="fas fa-play mr-2"></i> Start Tracking
+                        <button id="trackingBtn" onclick="toggleTracking()" class="w-full bg-white text-green-600 p-4 rounded-lg hover:bg-gray-100 transition text-lg font-semibold mb-4 shadow-lg" disabled>
+                            <i class="fas fa-play mr-2"></i> Start Your Service
                         </button>
                         
-                        <div id="trackingStatus" class="text-center p-4 bg-gray-50 rounded-lg">
+                        <div id="trackingStatus" class="text-center p-4 bg-white/20 backdrop-blur rounded-lg">
                             <div class="flex items-center justify-center space-x-2">
-                                <div id="statusDot" class="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <span class="text-gray-700">Status: <span id="statusText" class="font-semibold text-red-600">Inactive</span></span>
+                                <div id="statusDot" class="w-3 h-3 bg-red-300 rounded-full animate-pulse"></div>
+                                <span class="text-white">Status: <span id="statusText" class="font-semibold">Inactive</span></span>
                             </div>
-                            <p class="text-sm text-gray-500 mt-2">Please assign bus details first</p>
+                            <p class="text-sm text-white/80 mt-2">Please assign bus details first</p>
                         </div>
                     </div>
 
                     <!-- Trip Statistics Card -->
                     <div class="bg-white border border-gray-200 p-6 rounded-lg">
                         <h3 class="text-lg font-semibold mb-4 text-gray-800">
-                            <i class="fas fa-chart-line mr-2"></i> Trip Statistics
+                            <i class="fas fa-chart-line mr-2"></i> Work Session & Trip Statistics
                         </h3>
                         <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-clock mr-1"></i> Work Hours
+                                </span>
+                                <span id="tripDuration" class="font-semibold text-lg text-blue-600">00:00</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-user-clock mr-1"></i> Fatigue Level
+                                </span>
+                                <span id="fatigueLevel" class="font-semibold text-lg text-green-600">NORMAL</span>
+                            </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-600">
                                     <i class="fas fa-route mr-1"></i> Distance
                                 </span>
                                 <span id="tripDistance" class="font-semibold text-lg">0.0 km</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600">
-                                    <i class="fas fa-clock mr-1"></i> Duration
-                                </span>
-                                <span id="tripDuration" class="font-semibold text-lg">00:00</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-600">
@@ -278,12 +322,18 @@
                     </div>
 
                     <!-- Quick Actions -->
-                    <div class="space-y-2">
-                        <button onclick="sendAlert('break')" class="w-full bg-yellow-500 text-white p-3 rounded-lg hover:bg-yellow-600 transition">
-                            <i class="fas fa-coffee mr-2"></i> Break Time
+                    <div class="space-y-3">
+                        <h4 class="font-semibold text-gray-800 mb-3">
+                            <i class="fas fa-bolt text-yellow-500 mr-2"></i>Quick Actions
+                        </h4>
+                        <button onclick="sendAlert('break')" class="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-3 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition shadow-lg">
+                            <i class="fas fa-coffee mr-2"></i> Take a Break
                         </button>
-                        <button onclick="sendAlert('traffic')" class="w-full bg-orange-500 text-white p-3 rounded-lg hover:bg-orange-600 transition">
-                            <i class="fas fa-traffic-light mr-2"></i> Heavy Traffic
+                        <button onclick="sendAlert('traffic')" class="w-full bg-gradient-to-r from-orange-400 to-red-500 text-white p-3 rounded-lg hover:from-orange-500 hover:to-red-600 transition shadow-lg">
+                            <i class="fas fa-traffic-light mr-2"></i> Report Traffic
+                        </button>
+                        <button onclick="sendAlert('help')" class="w-full bg-gradient-to-r from-blue-400 to-purple-500 text-white p-3 rounded-lg hover:from-blue-500 hover:to-purple-600 transition shadow-lg">
+                            <i class="fas fa-hand-paper mr-2"></i> Need Assistance
                         </button>
                     </div>
                 </div>
@@ -311,13 +361,13 @@
                     </div>
                 </div>
 
-                <!-- GPS Accuracy -->
+                <!-- Driver Status -->
                 <div class="absolute top-4 left-4 bg-white rounded-lg shadow-lg px-3 py-2 z-20">
                     <div class="flex items-center space-x-2">
-                        <i id="gpsStatusIcon" class="fas fa-satellite text-gray-400"></i>
+                        <i class="fas fa-user-circle text-green-600"></i>
                         <div>
-                            <span class="text-sm">GPS: <span id="gpsAccuracy">--</span>m</span>
-                            <div class="text-xs text-gray-500" id="gpsStatus">Initializing...</div>
+                            <span class="text-sm font-medium" id="mapDriverName">Driver Ready</span>
+                            <div class="text-xs text-gray-500">Service Status</div>
                         </div>
                     </div>
                 </div>
@@ -326,8 +376,8 @@
 
         <!-- Emergency Button -->
         <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 lg:bottom-8 lg:right-8 lg:left-auto lg:transform-none z-30">
-            <button onclick="sendEmergencyAlert()" class="bg-red-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-red-700 transition text-lg font-semibold">
-                <i class="fas fa-exclamation-triangle mr-2"></i> Emergency
+            <button onclick="sendEmergencyAlert()" class="bg-gradient-to-r from-red-500 to-red-700 text-white px-8 py-4 rounded-full shadow-2xl hover:from-red-600 hover:to-red-800 transition text-lg font-bold animate-pulse">
+                <i class="fas fa-exclamation-triangle mr-2 text-yellow-300"></i> EMERGENCY
             </button>
         </div>
     </div>
@@ -335,6 +385,7 @@
     <!-- Load Scripts -->
     <script src="../JS/config.js"></script>
     <script src="../JS/common.js"></script>
+    <script src="../JS/iot-integration.js"></script>
     <script src="../JS/driver-app.js"></script>
 </body>
 </html>

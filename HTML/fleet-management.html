@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet Management - Punjab Transport Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .main-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; 
+                          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); margin: 20px auto; max-width: 1400px; padding: 30px; }
+        .nav-tabs .nav-link { background: transparent; border: 2px solid #667eea; color: #667eea; font-weight: 600; 
+                              margin-right: 10px; border-radius: 10px; transition: all 0.3s ease; }
+        .nav-tabs .nav-link.active { background: #667eea; border-color: #667eea; color: white; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e9ecef; padding: 12px 15px; }
+        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); border: none; border-radius: 10px; 
+                       padding: 12px 30px; font-weight: 600; }
+        .table thead th { background: #667eea; color: white; border: none; font-weight: 600; }
+        .status-active { background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-inactive { background: #f8d7da; color: #721c24; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="fas fa-truck-moving text-primary"></i> Fleet Management System</h2>
+                <button class="btn btn-outline-secondary" onclick="goBack()">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </button>
+            </div>
+
+            <ul class="nav nav-tabs mb-4" id="fleetTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="drivers-tab" data-bs-toggle="tab" data-bs-target="#drivers" type="button" role="tab">
+                        <i class="fas fa-user-tie"></i> Driver Management
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles" type="button" role="tab">
+                        <i class="fas fa-bus"></i> Vehicle Management
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab">
+                        <i class="fas fa-link"></i> Assignments
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="fleetTabContent">
+                <!-- Driver Management Tab -->
+                <div class="tab-pane fade show active" id="drivers" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-5">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-user-plus"></i> Add New Driver</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="addDriverForm">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">First Name *</label>
+                                                <input type="text" class="form-control" id="driverFirstName" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Last Name *</label>
+                                                <input type="text" class="form-control" id="driverLastName" required>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Mobile Number *</label>
+                                            <input type="tel" class="form-control" id="driverMobile" pattern="[0-9]{10}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="driverEmail">
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Date of Birth *</label>
+                                                <input type="date" class="form-control" id="driverDOB" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Gender *</label>
+                                                <select class="form-select" id="driverGender" required>
+                                                    <option value="">Select Gender</option>
+                                                    <option value="male">Male</option>
+                                                    <option value="female">Female</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Address *</label>
+                                            <textarea class="form-control" id="driverAddress" rows="2" required></textarea>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">City *</label>
+                                                <select class="form-select" id="driverCity" required>
+                                                    <option value="">Select City</option>
+                                                    <option value="amritsar">Amritsar</option>
+                                                    <option value="ludhiana">Ludhiana</option>
+                                                    <option value="jalandhar">Jalandhar</option>
+                                                    <option value="patiala">Patiala</option>
+                                                    <option value="bathinda">Bathinda</option>
+                                                    <option value="mohali">Mohali</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Pincode *</label>
+                                                <input type="text" class="form-control" id="driverPincode" pattern="[0-9]{6}" required>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">License Number *</label>
+                                                <input type="text" class="form-control" id="driverLicense" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">License Expiry *</label>
+                                                <input type="date" class="form-control" id="driverLicenseExpiry" required>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Experience (years) *</label>
+                                            <input type="number" class="form-control" id="driverExperience" min="0" max="50" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-user-plus"></i> Register Driver
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0"><i class="fas fa-users"></i> Registered Drivers</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr><th>Driver ID</th><th>Name</th><th>Mobile</th><th>City</th><th>Status</th><th>Actions</th></tr>
+                                            </thead>
+                                            <tbody id="driversTableBody">
+                                                <tr><td colspan="6" class="text-center text-muted">Loading drivers...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vehicle Management Tab -->
+                <div class="tab-pane fade" id="vehicles" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-5">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Add New Vehicle</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="addVehicleForm">
+                                        <div class="mb-3">
+                                            <label class="form-label">Registration Number *</label>
+                                            <input type="text" class="form-control text-uppercase" id="vehicleRegNumber" 
+                                                   placeholder="PB XX XX XXXX" required>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Make *</label>
+                                                <select class="form-select" id="vehicleMake" required>
+                                                    <option value="">Select Make</option>
+                                                    <option value="tata">Tata Motors</option>
+                                                    <option value="ashok-leyland">Ashok Leyland</option>
+                                                    <option value="mahindra">Mahindra</option>
+                                                    <option value="maruti">Maruti Suzuki</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Model *</label>
+                                                <input type="text" class="form-control" id="vehicleModel" required>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Year *</label>
+                                                <input type="number" class="form-control" id="vehicleYear" 
+                                                       min="1990" max="2025" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Vehicle Type *</label>
+                                                <select class="form-select" id="vehicleType" required>
+                                                    <option value="">Select Type</option>
+                                                    <option value="bus">Bus</option>
+                                                    <option value="mini-bus">Mini Bus</option>
+                                                    <option value="taxi">Taxi</option>
+                                                    <option value="auto-rickshaw">Auto Rickshaw</option>
+                                                    <option value="truck">Truck</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Seating Capacity *</label>
+                                                <input type="number" class="form-control" id="vehicleCapacity" min="1" max="100" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Fuel Type *</label>
+                                                <select class="form-select" id="vehicleFuelType" required>
+                                                    <option value="">Select Fuel</option>
+                                                    <option value="petrol">Petrol</option>
+                                                    <option value="diesel">Diesel</option>
+                                                    <option value="cng">CNG</option>
+                                                    <option value="electric">Electric</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus-circle"></i> Register Vehicle
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0"><i class="fas fa-list"></i> Registered Vehicles</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr><th>Reg. Number</th><th>Make/Model</th><th>Type</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
+                                            </thead>
+                                            <tbody id="vehiclesTableBody">
+                                                <tr><td colspan="6" class="text-center text-muted">Loading vehicles...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assignments Tab -->
+                <div class="tab-pane fade" id="assignments" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-4">
+                            <div class="card">
+                                <div class="card-header bg-dark text-white">
+                                    <h5 class="mb-0"><i class="fas fa-link"></i> Create Assignment</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="createAssignmentForm">
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Driver *</label>
+                                            <select class="form-select" id="assignmentDriver" required>
+                                                <option value="">Choose Driver</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Select Vehicle *</label>
+                                            <select class="form-select" id="assignmentVehicle" required>
+                                                <option value="">Choose Vehicle</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Route *</label>
+                                            <input type="text" class="form-control" id="assignmentRoute" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Start Date *</label>
+                                            <input type="date" class="form-control" id="assignmentStartDate" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-dark w-100">
+                                            <i class="fas fa-link"></i> Create Assignment
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="card-header bg-secondary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Current Assignments</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr><th>Assignment ID</th><th>Driver</th><th>Vehicle</th><th>Route</th><th>Status</th><th>Actions</th></tr>
+                                            </thead>
+                                            <tbody id="assignmentsTableBody">
+                                                <tr><td colspan="6" class="text-center text-muted">Loading assignments...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="alertToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    <script src="../JS/fleet-management.js"></script>
+    <script>
+        let fleetManager;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize with sample data for demo
+            initializeFleetManager();
+            loadData();
+            setupEventListeners();
+        });
+        
+        function initializeFleetManager() {
+            // Simple fleet manager for demo purposes
+            fleetManager = {
+                drivers: new Map(),
+                vehicles: new Map(),
+                assignments: new Map(),
+                
+                registerDriver: function(driverData) {
+                    const driverId = 'DRV' + Date.now().toString().slice(-6);
+                    const driver = {
+                        driverId: driverId,
+                        personalInfo: driverData.personalInfo,
+                        contactInfo: driverData.contactInfo,
+                        licenseInfo: driverData.licenseInfo,
+                        experience: driverData.experience,
+                        status: 'active',
+                        registrationDate: new Date().toISOString().split('T')[0]
+                    };
+                    this.drivers.set(driverId, driver);
+                    return { success: true, driverId: driverId };
+                },
+                
+                registerVehicle: function(vehicleData) {
+                    const vehicleId = 'VEH' + Date.now().toString().slice(-6);
+                    const vehicle = {
+                        vehicleId: vehicleId,
+                        registrationNumber: vehicleData.registrationNumber,
+                        specifications: vehicleData.specifications,
+                        status: 'available',
+                        registrationDate: new Date().toISOString().split('T')[0]
+                    };
+                    this.vehicles.set(vehicleId, vehicle);
+                    return { success: true, vehicleId: vehicleId };
+                },
+                
+                assignDriverToVehicle: function(driverId, vehicleId, assignmentData) {
+                    const assignmentId = 'ASG' + Date.now().toString().slice(-6);
+                    const assignment = {
+                        assignmentId: assignmentId,
+                        driverId: driverId,
+                        vehicleId: vehicleId,
+                        route: assignmentData.route,
+                        startDate: assignmentData.startDate,
+                        status: 'active'
+                    };
+                    this.assignments.set(assignmentId, assignment);
+                    
+                    // Update driver and vehicle status
+                    const driver = this.drivers.get(driverId);
+                    const vehicle = this.vehicles.get(vehicleId);
+                    if (driver) driver.status = 'assigned';
+                    if (vehicle) vehicle.status = 'assigned';
+                    
+                    return { success: true, assignmentId: assignmentId };
+                },
+                
+                endAssignment: function(assignmentId) {
+                    const assignment = this.assignments.get(assignmentId);
+                    if (assignment) {
+                        assignment.status = 'completed';
+                        
+                        // Free up driver and vehicle
+                        const driver = this.drivers.get(assignment.driverId);
+                        const vehicle = this.vehicles.get(assignment.vehicleId);
+                        if (driver) driver.status = 'active';
+                        if (vehicle) vehicle.status = 'available';
+                    }
+                }
+            };
+            
+            // Add some sample data for demonstration
+            addSampleData();
+        }
+        
+        function addSampleData() {
+            // Add sample drivers
+            const sampleDrivers = [
+                {
+                    personalInfo: { firstName: 'Rajesh', lastName: 'Singh', dateOfBirth: '1985-05-15', gender: 'male' },
+                    contactInfo: { mobile: '9876543210', email: 'rajesh@example.com', address: 'Sector 17, Chandigarh', city: 'chandigarh', pincode: '160017' },
+                    licenseInfo: { licenseNumber: 'PB0123456789', expiryDate: '2025-12-31', categories: ['LMV', 'HMV'] },
+                    experience: 8
+                },
+                {
+                    personalInfo: { firstName: 'Preet', lastName: 'Kaur', dateOfBirth: '1990-03-20', gender: 'female' },
+                    contactInfo: { mobile: '9876543211', email: 'preet@example.com', address: 'Model Town, Ludhiana', city: 'ludhiana', pincode: '141002' },
+                    licenseInfo: { licenseNumber: 'PB0123456790', expiryDate: '2026-06-30', categories: ['LMV'] },
+                    experience: 5
+                }
+            ];
+            
+            sampleDrivers.forEach(driver => {
+                fleetManager.registerDriver(driver);
+            });
+            
+            // Add sample vehicles
+            const sampleVehicles = [
+                {
+                    registrationNumber: 'PB 03 AB 1234',
+                    specifications: { make: 'tata', model: 'Starbus', year: 2022, type: 'bus', seatingCapacity: 40, fuelType: 'diesel' }
+                },
+                {
+                    registrationNumber: 'PB 10 CD 5678',
+                    specifications: { make: 'ashok-leyland', model: 'Viking', year: 2021, type: 'bus', seatingCapacity: 35, fuelType: 'cng' }
+                }
+            ];
+            
+            sampleVehicles.forEach(vehicle => {
+                fleetManager.registerVehicle(vehicle);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('addDriverForm').addEventListener('submit', handleDriverSubmit);
+            document.getElementById('addVehicleForm').addEventListener('submit', handleVehicleSubmit);
+            document.getElementById('createAssignmentForm').addEventListener('submit', handleAssignmentSubmit);
+        }
+
+        async function handleDriverSubmit(e) {
+            e.preventDefault();
+            try {
+                const driverData = {
+                    personalInfo: {
+                        firstName: document.getElementById('driverFirstName').value,
+                        lastName: document.getElementById('driverLastName').value,
+                        dateOfBirth: document.getElementById('driverDOB').value,
+                        gender: document.getElementById('driverGender').value
+                    },
+                    contactInfo: {
+                        mobile: document.getElementById('driverMobile').value,
+                        email: document.getElementById('driverEmail').value,
+                        address: document.getElementById('driverAddress').value,
+                        city: document.getElementById('driverCity').value,
+                        pincode: document.getElementById('driverPincode').value
+                    },
+                    licenseInfo: {
+                        licenseNumber: document.getElementById('driverLicense').value,
+                        expiryDate: document.getElementById('driverLicenseExpiry').value,
+                        categories: []
+                    },
+                    experience: parseInt(document.getElementById('driverExperience').value)
+                };
+                
+                const result = await fleetManager.registerDriver(driverData);
+                showToast('Success', 'Driver registered successfully!', 'success');
+                document.getElementById('addDriverForm').reset();
+                loadDriverList();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        async function handleVehicleSubmit(e) {
+            e.preventDefault();
+            try {
+                const vehicleData = {
+                    registrationNumber: document.getElementById('vehicleRegNumber').value.toUpperCase(),
+                    specifications: {
+                        make: document.getElementById('vehicleMake').value,
+                        model: document.getElementById('vehicleModel').value,
+                        year: parseInt(document.getElementById('vehicleYear').value),
+                        type: document.getElementById('vehicleType').value,
+                        seatingCapacity: parseInt(document.getElementById('vehicleCapacity').value),
+                        fuelType: document.getElementById('vehicleFuelType').value
+                    }
+                };
+                
+                const result = await fleetManager.registerVehicle(vehicleData);
+                showToast('Success', 'Vehicle registered successfully!', 'success');
+                document.getElementById('addVehicleForm').reset();
+                loadVehicleList();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        async function handleAssignmentSubmit(e) {
+            e.preventDefault();
+            try {
+                const assignmentData = {
+                    driverId: document.getElementById('assignmentDriver').value,
+                    vehicleId: document.getElementById('assignmentVehicle').value,
+                    route: document.getElementById('assignmentRoute').value,
+                    startDate: document.getElementById('assignmentStartDate').value
+                };
+                
+                const result = await fleetManager.assignDriverToVehicle(
+                    assignmentData.driverId, 
+                    assignmentData.vehicleId, 
+                    assignmentData
+                );
+                showToast('Success', 'Assignment created successfully!', 'success');
+                document.getElementById('createAssignmentForm').reset();
+                loadAssignmentList();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        function loadData() {
+            loadDriverList();
+            loadVehicleList();
+            loadAssignmentList();
+            loadDropdowns();
+        }
+
+        function loadDriverList() {
+            const tbody = document.getElementById('driversTableBody');
+            const drivers = Array.from(fleetManager.drivers.values());
+            
+            if (drivers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No drivers registered</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = drivers.map(driver => `
+                <tr>
+                    <td>${driver.driverId}</td>
+                    <td>${driver.personalInfo.firstName} ${driver.personalInfo.lastName}</td>
+                    <td>${driver.contactInfo.mobile}</td>
+                    <td>${driver.contactInfo.city || 'N/A'}</td>
+                    <td><span class="status-${driver.status}">${driver.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewDriver('${driver.driverId}')">View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editDriver('${driver.driverId}')">Edit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadVehicleList() {
+            const tbody = document.getElementById('vehiclesTableBody');
+            const vehicles = Array.from(fleetManager.vehicles.values());
+            
+            if (vehicles.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No vehicles registered</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = vehicles.map(vehicle => `
+                <tr>
+                    <td>${vehicle.registrationNumber}</td>
+                    <td>${vehicle.specifications.make} ${vehicle.specifications.model}</td>
+                    <td>${vehicle.specifications.type}</td>
+                    <td>${vehicle.specifications.seatingCapacity}</td>
+                    <td><span class="status-${vehicle.status}">${vehicle.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewVehicle('${vehicle.vehicleId}')">View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editVehicle('${vehicle.vehicleId}')">Edit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadAssignmentList() {
+            const tbody = document.getElementById('assignmentsTableBody');
+            const assignments = Array.from(fleetManager.assignments.values());
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No assignments created</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = assignments.map(assignment => {
+                const driver = fleetManager.drivers.get(assignment.driverId);
+                const vehicle = fleetManager.vehicles.get(assignment.vehicleId);
+                return `
+                    <tr>
+                        <td>${assignment.assignmentId}</td>
+                        <td>${driver ? driver.personalInfo.firstName + ' ' + driver.personalInfo.lastName : 'N/A'}</td>
+                        <td>${vehicle ? vehicle.registrationNumber : 'N/A'}</td>
+                        <td>${assignment.route || 'N/A'}</td>
+                        <td><span class="status-${assignment.status}">${assignment.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="endAssignment('${assignment.assignmentId}')">End</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadDropdowns() {
+            const driverSelect = document.getElementById('assignmentDriver');
+            const vehicleSelect = document.getElementById('assignmentVehicle');
+            
+            const availableDrivers = Array.from(fleetManager.drivers.values()).filter(d => d.status === 'active');
+            const availableVehicles = Array.from(fleetManager.vehicles.values()).filter(v => v.status === 'available');
+            
+            driverSelect.innerHTML = '<option value="">Choose Driver</option>' + 
+                availableDrivers.map(driver => 
+                    `<option value="${driver.driverId}">${driver.personalInfo.firstName} ${driver.personalInfo.lastName}</option>`
+                ).join('');
+                
+            vehicleSelect.innerHTML = '<option value="">Choose Vehicle</option>' + 
+                availableVehicles.map(vehicle => 
+                    `<option value="${vehicle.vehicleId}">${vehicle.registrationNumber} (${vehicle.specifications.type})</option>`
+                ).join('');
+        }
+
+        function showToast(title, message, type) {
+            const toast = document.getElementById('alertToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function goBack() {
+            window.location.href = 'admin-dashboard.html';
+        }
+
+        function viewDriver(driverId) { console.log('View driver:', driverId); }
+        function editDriver(driverId) { console.log('Edit driver:', driverId); }
+        function viewVehicle(vehicleId) { console.log('View vehicle:', vehicleId); }
+        function editVehicle(vehicleId) { console.log('Edit vehicle:', vehicleId); }
+        function endAssignment(assignmentId) { 
+            fleetManager.endAssignment(assignmentId);
+            loadAssignmentList();
+            loadDropdowns();
+        }
+    </script>
+</body>
+</html>

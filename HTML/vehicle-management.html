@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Management - Punjab Transport Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .main-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; 
+                          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); margin: 20px auto; max-width: 1400px; padding: 30px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e9ecef; padding: 12px 15px; }
+        .btn-success { background: linear-gradient(45deg, #28a745, #20c997); border: none; border-radius: 10px; 
+                       padding: 12px 30px; font-weight: 600; }
+        .table thead th { background: #28a745; color: white; border: none; font-weight: 600; }
+        .status-available { background: #d4edda; color: #155724; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-assigned { background: #cce5ff; color: #004085; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+        .status-maintenance { background: #fff3cd; color: #856404; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0"><i class="fas fa-bus text-success"></i> Vehicle Management System</h2>
+                <div>
+                    <button class="btn btn-outline-primary me-2" onclick="goToDriverManagement()">
+                        <i class="fas fa-user-tie"></i> Driver Management
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="goBack()">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Add New Vehicle Form -->
+                <div class="col-lg-5">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Add New Vehicle</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="addVehicleForm">
+                                <div class="mb-3">
+                                    <label class="form-label">Registration Number *</label>
+                                    <input type="text" class="form-control text-uppercase" id="vehicleRegNumber" 
+                                           placeholder="PB XX XX XXXX" required>
+                                    <small class="text-muted">Format: PB 03 AB 1234</small>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Make *</label>
+                                        <select class="form-select" id="vehicleMake" required>
+                                            <option value="">Select Make</option>
+                                            <option value="tata">Tata Motors</option>
+                                            <option value="ashok-leyland">Ashok Leyland</option>
+                                            <option value="mahindra">Mahindra</option>
+                                            <option value="maruti">Maruti Suzuki</option>
+                                            <option value="hyundai">Hyundai</option>
+                                            <option value="force">Force Motors</option>
+                                            <option value="eicher">Eicher Motors</option>
+                                            <option value="bharat-benz">Bharat Benz</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Model *</label>
+                                        <input type="text" class="form-control" id="vehicleModel" required>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Year *</label>
+                                        <input type="number" class="form-control" id="vehicleYear" 
+                                               min="1990" max="2025" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Color</label>
+                                        <input type="text" class="form-control" id="vehicleColor">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Vehicle Type *</label>
+                                    <select class="form-select" id="vehicleType" required>
+                                        <option value="">Select Type</option>
+                                        <option value="bus">Bus</option>
+                                        <option value="mini-bus">Mini Bus</option>
+                                        <option value="taxi">Taxi</option>
+                                        <option value="auto-rickshaw">Auto Rickshaw</option>
+                                        <option value="truck">Truck</option>
+                                        <option value="tempo">Tempo</option>
+                                        <option value="van">Van</option>
+                                    </select>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Seating Capacity *</label>
+                                        <input type="number" class="form-control" id="vehicleCapacity" min="1" max="100" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Fuel Type *</label>
+                                        <select class="form-select" id="vehicleFuelType" required>
+                                            <option value="">Select Fuel</option>
+                                            <option value="petrol">Petrol</option>
+                                            <option value="diesel">Diesel</option>
+                                            <option value="cng">CNG</option>
+                                            <option value="electric">Electric</option>
+                                            <option value="hybrid">Hybrid</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Features</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureAC">
+                                                <label class="form-check-label" for="featureAC">Air Conditioning</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureGPS">
+                                                <label class="form-check-label" for="featureGPS">GPS Tracking</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureWiFi">
+                                                <label class="form-check-label" for="featureWiFi">WiFi</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureCCTV">
+                                                <label class="form-check-label" for="featureCCTV">CCTV</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureFirstAid">
+                                                <label class="form-check-label" for="featureFirstAid">First Aid Kit</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="featureFireExtinguisher">
+                                                <label class="form-check-label" for="featureFireExtinguisher">Fire Extinguisher</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Insurance Details</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" id="insuranceNumber" placeholder="Policy Number">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="date" class="form-control" id="insuranceExpiry" placeholder="Expiry Date">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">PUC Details</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" id="pucNumber" placeholder="PUC Number">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="date" class="form-control" id="pucExpiry" placeholder="Expiry Date">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Fitness Certificate Expiry</label>
+                                    <input type="date" class="form-control" id="fitnessExpiry">
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="fas fa-plus-circle"></i> Register Vehicle
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vehicle List -->
+                <div class="col-lg-7">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-list"></i> Registered Vehicles</h5>
+                            <button class="btn btn-dark btn-sm" onclick="refreshVehicleList()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Reg. Number</th>
+                                            <th>Make/Model</th>
+                                            <th>Type</th>
+                                            <th>Capacity</th>
+                                            <th>Fuel</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vehiclesTableBody">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted">
+                                                <i class="fas fa-spinner fa-spin"></i> Loading vehicles...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vehicle Details Modal -->
+    <div class="modal fade" id="vehicleDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-bus"></i> Vehicle Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="vehicleDetailsContent">
+                    <!-- Vehicle details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="alertToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let vehicleManager;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeVehicleManager();
+            loadVehicleData();
+            setupEventListeners();
+        });
+        
+        function initializeVehicleManager() {
+            vehicleManager = {
+                vehicles: new Map(),
+                
+                registerVehicle: function(vehicleData) {
+                    const vehicleId = 'VEH' + Date.now().toString().slice(-6);
+                    const vehicle = {
+                        vehicleId: vehicleId,
+                        registrationNumber: vehicleData.registrationNumber,
+                        specifications: vehicleData.specifications,
+                        features: vehicleData.features,
+                        documentation: vehicleData.documentation,
+                        status: 'available',
+                        registrationDate: new Date().toISOString().split('T')[0]
+                    };
+                    this.vehicles.set(vehicleId, vehicle);
+                    this.saveToLocalStorage();
+                    return { success: true, vehicleId: vehicleId };
+                },
+                
+                loadFromLocalStorage: function() {
+                    const saved = localStorage.getItem('punjabTransportVehicles');
+                    if (saved) {
+                        const vehiclesArray = JSON.parse(saved);
+                        vehiclesArray.forEach(vehicle => {
+                            this.vehicles.set(vehicle.vehicleId, vehicle);
+                        });
+                    }
+                },
+                
+                saveToLocalStorage: function() {
+                    const vehiclesArray = Array.from(this.vehicles.values());
+                    localStorage.setItem('punjabTransportVehicles', JSON.stringify(vehiclesArray));
+                }
+            };
+            
+            // Load existing data
+            vehicleManager.loadFromLocalStorage();
+            
+            // Add sample data if empty
+            if (vehicleManager.vehicles.size === 0) {
+                addSampleVehicles();
+            }
+        }
+        
+        function addSampleVehicles() {
+            const sampleVehicles = [
+                {
+                    registrationNumber: 'PB 03 AB 1234',
+                    specifications: { 
+                        make: 'tata', 
+                        model: 'Starbus', 
+                        year: 2022, 
+                        type: 'bus', 
+                        seatingCapacity: 40, 
+                        fuelType: 'diesel',
+                        color: 'White'
+                    },
+                    features: ['AC', 'GPS', 'CCTV', 'FirstAid'],
+                    documentation: {
+                        insurance: { number: 'INS123456', expiry: '2024-12-31' },
+                        puc: { number: 'PUC789012', expiry: '2024-06-30' },
+                        fitness: { expiry: '2025-03-31' }
+                    }
+                },
+                {
+                    registrationNumber: 'PB 10 CD 5678',
+                    specifications: { 
+                        make: 'ashok-leyland', 
+                        model: 'Viking', 
+                        year: 2021, 
+                        type: 'bus', 
+                        seatingCapacity: 35, 
+                        fuelType: 'cng',
+                        color: 'Blue'
+                    },
+                    features: ['AC', 'GPS', 'WiFi'],
+                    documentation: {
+                        insurance: { number: 'INS234567', expiry: '2024-10-31' },
+                        puc: { number: 'PUC890123', expiry: '2024-08-31' },
+                        fitness: { expiry: '2025-01-31' }
+                    }
+                }
+            ];
+            
+            sampleVehicles.forEach(vehicle => {
+                vehicleManager.registerVehicle(vehicle);
+            });
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('addVehicleForm').addEventListener('submit', handleVehicleSubmit);
+        }
+
+        async function handleVehicleSubmit(e) {
+            e.preventDefault();
+            try {
+                const features = [];
+                if (document.getElementById('featureAC').checked) features.push('AC');
+                if (document.getElementById('featureGPS').checked) features.push('GPS');
+                if (document.getElementById('featureWiFi').checked) features.push('WiFi');
+                if (document.getElementById('featureCCTV').checked) features.push('CCTV');
+                if (document.getElementById('featureFirstAid').checked) features.push('FirstAid');
+                if (document.getElementById('featureFireExtinguisher').checked) features.push('FireExtinguisher');
+                
+                const vehicleData = {
+                    registrationNumber: document.getElementById('vehicleRegNumber').value.toUpperCase(),
+                    specifications: {
+                        make: document.getElementById('vehicleMake').value,
+                        model: document.getElementById('vehicleModel').value,
+                        year: parseInt(document.getElementById('vehicleYear').value),
+                        color: document.getElementById('vehicleColor').value,
+                        type: document.getElementById('vehicleType').value,
+                        seatingCapacity: parseInt(document.getElementById('vehicleCapacity').value),
+                        fuelType: document.getElementById('vehicleFuelType').value
+                    },
+                    features: features,
+                    documentation: {
+                        insurance: {
+                            number: document.getElementById('insuranceNumber').value,
+                            expiry: document.getElementById('insuranceExpiry').value
+                        },
+                        puc: {
+                            number: document.getElementById('pucNumber').value,
+                            expiry: document.getElementById('pucExpiry').value
+                        },
+                        fitness: {
+                            expiry: document.getElementById('fitnessExpiry').value
+                        }
+                    }
+                };
+                
+                const result = vehicleManager.registerVehicle(vehicleData);
+                showToast('Success', 'Vehicle registered successfully!', 'success');
+                document.getElementById('addVehicleForm').reset();
+                loadVehicleList();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        }
+
+        function loadVehicleData() {
+            loadVehicleList();
+        }
+
+        function loadVehicleList() {
+            const tbody = document.getElementById('vehiclesTableBody');
+            const vehicles = Array.from(vehicleManager.vehicles.values());
+            
+            if (vehicles.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No vehicles registered</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = vehicles.map(vehicle => `
+                <tr>
+                    <td>${vehicle.registrationNumber}</td>
+                    <td>${vehicle.specifications.make} ${vehicle.specifications.model}</td>
+                    <td>${vehicle.specifications.type}</td>
+                    <td>${vehicle.specifications.seatingCapacity}</td>
+                    <td>${vehicle.specifications.fuelType}</td>
+                    <td><span class="status-${vehicle.status}">${vehicle.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewVehicle('${vehicle.vehicleId}')">View</button>
+                        <button class="btn btn-sm btn-warning" onclick="editVehicle('${vehicle.vehicleId}')">Edit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function refreshVehicleList() {
+            loadVehicleList();
+            showToast('Success', 'Vehicle list refreshed!', 'success');
+        }
+
+        function viewVehicle(vehicleId) {
+            const vehicle = vehicleManager.vehicles.get(vehicleId);
+            if (!vehicle) return;
+            
+            const content = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Vehicle Information</h6>
+                        <p><strong>Registration:</strong> ${vehicle.registrationNumber}</p>
+                        <p><strong>Make/Model:</strong> ${vehicle.specifications.make} ${vehicle.specifications.model}</p>
+                        <p><strong>Year:</strong> ${vehicle.specifications.year}</p>
+                        <p><strong>Color:</strong> ${vehicle.specifications.color || 'N/A'}</p>
+                        <p><strong>Type:</strong> ${vehicle.specifications.type}</p>
+                        <p><strong>Capacity:</strong> ${vehicle.specifications.seatingCapacity} seats</p>
+                        <p><strong>Fuel Type:</strong> ${vehicle.specifications.fuelType}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Features</h6>
+                        <p>${vehicle.features && vehicle.features.length > 0 ? vehicle.features.join(', ') : 'No features listed'}</p>
+                        
+                        <h6 class="mt-3">Documentation</h6>
+                        <p><strong>Insurance:</strong> ${vehicle.documentation?.insurance?.number || 'N/A'} 
+                           ${vehicle.documentation?.insurance?.expiry ? '(Exp: ' + vehicle.documentation.insurance.expiry + ')' : ''}</p>
+                        <p><strong>PUC:</strong> ${vehicle.documentation?.puc?.number || 'N/A'} 
+                           ${vehicle.documentation?.puc?.expiry ? '(Exp: ' + vehicle.documentation.puc.expiry + ')' : ''}</p>
+                        <p><strong>Fitness:</strong> ${vehicle.documentation?.fitness?.expiry ? 'Valid till ' + vehicle.documentation.fitness.expiry : 'N/A'}</p>
+                        
+                        <p><strong>Status:</strong> <span class="status-${vehicle.status}">${vehicle.status}</span></p>
+                        <p><strong>Registration Date:</strong> ${vehicle.registrationDate}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('vehicleDetailsContent').innerHTML = content;
+            new bootstrap.Modal(document.getElementById('vehicleDetailsModal')).show();
+        }
+
+        function editVehicle(vehicleId) {
+            showToast('Info', 'Edit vehicle functionality coming soon!', 'info');
+        }
+
+        function showToast(title, message, type) {
+            const toast = document.getElementById('alertToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function goBack() {
+            window.location.href = 'admin-dashboard.html';
+        }
+        
+        function goToDriverManagement() {
+            window.location.href = 'driver-management.html';
+        }
+    </script>
+</body>
+</html>

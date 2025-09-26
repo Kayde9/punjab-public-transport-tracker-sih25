@@ -1,6 +1,11 @@
 // ===================================
-// Google Maps and Earth Integration
+// Google Maps, Earth, and KML Integration
 // ===================================
+
+// Global variables for KML management
+let kmlLayer = null;
+let routeKmlData = [];
+let currentKmlFile = null;
 
 let googleMapsLoaded = false;
 let googleMap = null;
@@ -356,6 +361,149 @@ function initializeFormHandlers() {
             updateRoute();
         });
     }
+    
+    // KML file upload handler
+    const kmlUpload = document.getElementById('kmlFileUpload');
+    if (kmlUpload) {
+        kmlUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && (file.name.endsWith('.kml') || file.name.endsWith('.kmz'))) {
+                loadKMLFile(file);
+            } else {
+                showNotification('Please select a valid KML file', 'error');
+            }
+        });
+    }
+}
+
+// ===================================
+// KML File Management System
+// ===================================
+
+/**
+ * Load and display KML file on the map
+ * @param {File} file - The KML file to load
+ */
+function loadKMLFile(file) {
+    console.log('📄 Loading KML file:', file.name);
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const kmlContent = e.target.result;
+            parseAndDisplayKML(kmlContent, file.name);
+        } catch (error) {
+            console.error('Error reading KML file:', error);
+            showNotification('Failed to read KML file', 'error');
+        }
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * Parse KML content and display on map
+ * @param {string} kmlContent - The KML file content
+ * @param {string} fileName - Name of the KML file
+ */
+function parseAndDisplayKML(kmlContent, fileName) {
+    console.log('🔍 Parsing KML content...');
+    
+    try {
+        // Parse KML using DOMParser
+        const parser = new DOMParser();
+        const kmlDoc = parser.parseFromString(kmlContent, 'application/xml');
+        
+        if (kmlDoc.getElementsByTagName('parsererror').length > 0) {
+            throw new Error('Invalid KML format');
+        }
+        
+        // Extract placemarks (routes, stops, etc.)
+        const placemarks = kmlDoc.getElementsByTagName('Placemark');
+        const extractedRoutes = [];
+        
+        console.log(`📍 Found ${placemarks.length} placemarks in KML`);
+        
+        for (let i = 0; i < placemarks.length; i++) {
+            const placemark = placemarks[i];
+            const routeData = extractRouteFromPlacemark(placemark);
+            
+            if (routeData) {
+                extractedRoutes.push(routeData);
+            }
+        }
+        
+        if (extractedRoutes.length > 0) {
+            displayKMLRoutes(extractedRoutes, fileName);
+            showNotification(`Successfully loaded ${extractedRoutes.length} routes from ${fileName}`, 'success');
+        } else {
+            showNotification('No valid routes found in KML file', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('Error parsing KML:', error);
+        showNotification('Failed to parse KML file: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Extract route data from a KML placemark
+ * @param {Element} placemark - KML Placemark element
+ * @returns {Object|null} Route data or null if invalid
+ */
+function extractRouteFromPlacemark(placemark) {
+    try {
+        const name = placemark.getElementsByTagName('name')[0]?.textContent || 'Unnamed Route';
+        const description = placemark.getElementsByTagName('description')[0]?.textContent || '';
+        
+        // Check for LineString (route path)
+        const lineString = placemark.getElementsByTagName('LineString')[0];
+        if (lineString) {
+            const coordinates = lineString.getElementsByTagName('coordinates')[0]?.textContent;
+            if (coordinates) {
+                const stops = parseKMLCoordinates(coordinates);
+                
+                return {
+                    id: 'kml_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    name: name,
+                    description: description,
+                    stops: stops,
+                    type: 'kml_import',
+                    color: extractKMLStyle(placemark) || '#3b82f6',
+                    source: 'kml_import'
+                };
+            }
+        }
+        
+        // Check for Point (single stop)
+        const point = placemark.getElementsByTagName('Point')[0];
+        if (point) {
+            const coordinates = point.getElementsByTagName('coordinates')[0]?.textContent;
+            if (coordinates) {
+                const coords = coordinates.trim().split(',');
+                const lng = parseFloat(coords[0]);
+                const lat = parseFloat(coords[1]);
+                const alt = coords[2] ? parseFloat(coords[2]) : 0;
+                
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    return {
+                        id: 'kml_stop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        name: name,
+                        description: description,
+                        type: 'stop',
+                        latitude: lat,
+                        longitude: lng,
+                        altitude: alt,
+                        source: 'kml_import'
+                    };
+                }
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error extracting route from placemark:', error);
+        return null;
+    }
 }
 
 function adminLogin(event) {
@@ -369,6 +517,776 @@ function adminLogin(event) {
     } else {
         alert('Invalid admin credentials.');
     }
+}
+
+// ===================================
+// Additional KML Helper Functions
+// ===================================
+
+/**
+ * Parse KML coordinates string into stops array
+ * @param {string} coordinatesString - KML coordinates string
+ * @returns {Array} Array of stop objects
+ */
+function parseKMLCoordinates(coordinatesString) {
+    const stops = [];
+    const lines = coordinatesString.trim().split(/\s+/);
+    
+    lines.forEach((line, index) => {
+        const coords = line.split(',');
+        if (coords.length >= 2) {
+            const lng = parseFloat(coords[0]);
+            const lat = parseFloat(coords[1]);
+            const alt = coords[2] ? parseFloat(coords[2]) : 0;
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                stops.push({
+                    id: `kml_stop_${index + 1}`,
+                    name: `Stop ${index + 1}`,
+                    latitude: lat,
+                    longitude: lng,
+                    altitude: alt,
+                    stopTime: 2 // Default stop time in minutes
+                });
+            }
+        }
+    });
+    
+    return stops;
+}
+
+/**
+ * Extract style information from KML placemark
+ * @param {Element} placemark - KML Placemark element
+ * @returns {string|null} Color hex code or null
+ */
+function extractKMLStyle(placemark) {
+    try {
+        // Check for inline style
+        const lineStyle = placemark.getElementsByTagName('LineStyle')[0];
+        if (lineStyle) {
+            const color = lineStyle.getElementsByTagName('color')[0]?.textContent;
+            if (color) {
+                // Convert KML color (aabbggrr) to CSS hex color (#rrggbb)
+                return convertKMLColorToHex(color);
+            }
+        }
+        
+        // Check for style reference
+        const styleUrl = placemark.getElementsByTagName('styleUrl')[0]?.textContent;
+        if (styleUrl) {
+            // In a full implementation, you would look up the style by ID
+            // For now, return a default color
+            return '#ea580c';
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error extracting KML style:', error);
+        return null;
+    }
+}
+
+/**
+ * Convert KML color format (aabbggrr) to CSS hex (#rrggbb)
+ * @param {string} kmlColor - KML color string
+ * @returns {string} CSS hex color
+ */
+function convertKMLColorToHex(kmlColor) {
+    if (kmlColor.length === 8) {
+        // Extract components: aabbggrr -> rrggbb
+        const r = kmlColor.substr(6, 2);
+        const g = kmlColor.substr(4, 2);
+        const b = kmlColor.substr(2, 2);
+        return `#${r}${g}${b}`;
+    }
+    return '#3b82f6'; // Default blue
+}
+
+/**
+ * Display KML routes on the map
+ * @param {Array} routes - Array of route objects extracted from KML
+ * @param {string} fileName - Name of the source KML file
+ */
+function displayKMLRoutes(routes, fileName) {
+    console.log('🗺️ Displaying KML routes on map:', routes.length);
+    
+    // Clear existing KML layer if any
+    if (kmlLayer) {
+        clearKMLLayer();
+    }
+    
+    // Store KML data
+    routeKmlData = routes;
+    currentKmlFile = fileName;
+    
+    // Display routes based on map type
+    if (googleMapsLoaded && adminMap) {
+        displayKMLRoutesOnGoogleMaps(routes);
+    } else if (adminMap) {
+        displayKMLRoutesOnLeaflet(routes);
+    }
+    
+    // Update UI
+    updateKMLRoutesList(routes, fileName);
+}
+
+/**
+ * Display KML routes on Google Maps
+ * @param {Array} routes - Array of route objects
+ */
+function displayKMLRoutesOnGoogleMaps(routes) {
+    console.log('📍 Displaying KML routes on Google Maps');
+    
+    const bounds = new google.maps.LatLngBounds();
+    
+    routes.forEach((route, index) => {
+        if (route.stops && route.stops.length > 0) {
+            // Create path for polyline
+            const path = route.stops.map(stop => ({
+                lat: stop.latitude,
+                lng: stop.longitude
+            }));
+            
+            // Create polyline
+            const polyline = new google.maps.Polyline({
+                path: path,
+                geodesic: true,
+                strokeColor: route.color || '#3b82f6',
+                strokeOpacity: 0.8,
+                strokeWeight: 4,
+                map: adminMap
+            });
+            
+            // Store reference for cleanup
+            if (!window.kmlPolylines) window.kmlPolylines = [];
+            window.kmlPolylines.push(polyline);
+            
+            // Add markers for stops
+            route.stops.forEach((stop, stopIndex) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: stop.latitude, lng: stop.longitude },
+                    map: adminMap,
+                    title: `${route.name} - ${stop.name}`,
+                    label: {
+                        text: (stopIndex + 1).toString(),
+                        color: 'white',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: route.color || '#3b82f6',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    }
+                });
+                
+                // Add info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 8px; max-width: 200px;">
+                            <h4 style="margin: 0 0 8px 0; color: ${route.color || '#3b82f6'};">
+                                🚏 ${stop.name}
+                            </h4>
+                            <p style="margin: 2px 0; font-size: 12px;">
+                                <strong>Route:</strong> ${route.name}
+                            </p>
+                            <p style="margin: 2px 0; font-size: 12px;">
+                                <strong>Coordinates:</strong> ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}
+                            </p>
+                            ${stop.altitude ? `<p style="margin: 2px 0; font-size: 12px;"><strong>Altitude:</strong> ${stop.altitude}m</p>` : ''}
+                            ${route.description ? `<p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">${route.description}</p>` : ''}
+                        </div>
+                    `
+                });
+                
+                marker.addListener('click', () => {
+                    infoWindow.open(adminMap, marker);
+                });
+                
+                // Store reference for cleanup
+                if (!window.kmlMarkers) window.kmlMarkers = [];
+                window.kmlMarkers.push(marker);
+                
+                // Extend bounds
+                bounds.extend({ lat: stop.latitude, lng: stop.longitude });
+            });
+        }
+    });
+    
+    // Fit map to show all routes
+    if (!bounds.isEmpty()) {
+        adminMap.fitBounds(bounds);
+    }
+}
+
+/**
+ * Display KML routes on Leaflet map
+ * @param {Array} routes - Array of route objects
+ */
+function displayKMLRoutesOnLeaflet(routes) {
+    console.log('🍃 Displaying KML routes on Leaflet');
+    
+    const group = L.featureGroup();
+    
+    routes.forEach((route, index) => {
+        if (route.stops && route.stops.length > 0) {
+            // Create path for polyline
+            const latlngs = route.stops.map(stop => [stop.latitude, stop.longitude]);
+            
+            // Create polyline
+            const polyline = L.polyline(latlngs, {
+                color: route.color || '#3b82f6',
+                weight: 4,
+                opacity: 0.8
+            });
+            
+            group.addLayer(polyline);
+            
+            // Add markers for stops
+            route.stops.forEach((stop, stopIndex) => {
+                const marker = L.marker([stop.latitude, stop.longitude], {
+                    icon: L.divIcon({
+                        className: 'kml-stop-marker',
+                        html: `
+                            <div style="
+                                background-color: ${route.color || '#3b82f6'};
+                                color: white;
+                                border-radius: 50%;
+                                width: 24px;
+                                height: 24px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                font-weight: bold;
+                                font-size: 12px;
+                                border: 2px solid white;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                            ">
+                                ${stopIndex + 1}
+                            </div>
+                        `,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                });
+                
+                // Add popup
+                marker.bindPopup(`
+                    <div style="min-width: 150px;">
+                        <h4 style="margin: 0 0 8px 0; color: ${route.color || '#3b82f6'};">
+                            🚏 ${stop.name}
+                        </h4>
+                        <p style="margin: 2px 0; font-size: 12px;">
+                            <strong>Route:</strong> ${route.name}
+                        </p>
+                        <p style="margin: 2px 0; font-size: 12px;">
+                            <strong>Coordinates:</strong> ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}
+                        </p>
+                        ${stop.altitude ? `<p style="margin: 2px 0; font-size: 12px;"><strong>Altitude:</strong> ${stop.altitude}m</p>` : ''}
+                        ${route.description ? `<p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">${route.description}</p>` : ''}
+                    </div>
+                `);
+                
+                group.addLayer(marker);
+            });
+        }
+    });
+    
+    // Add to map and fit bounds
+    kmlLayer = group;
+    group.addTo(adminMap);
+    adminMap.fitBounds(group.getBounds(), { padding: [20, 20] });
+}
+
+/**
+ * Clear KML layer from map
+ */
+function clearKMLLayer() {
+    console.log('🧹 Clearing KML layer from map');
+    
+    if (googleMapsLoaded && adminMap) {
+        // Clear Google Maps markers and polylines
+        if (window.kmlMarkers) {
+            window.kmlMarkers.forEach(marker => marker.setMap(null));
+            window.kmlMarkers = [];
+        }
+        if (window.kmlPolylines) {
+            window.kmlPolylines.forEach(polyline => polyline.setMap(null));
+            window.kmlPolylines = [];
+        }
+    } else if (kmlLayer && adminMap) {
+        // Clear Leaflet layer
+        adminMap.removeLayer(kmlLayer);
+    }
+    
+    kmlLayer = null;
+    routeKmlData = [];
+    currentKmlFile = null;
+}
+
+/**
+ * Update KML routes list in UI
+ * @param {Array} routes - Array of route objects
+ * @param {string} fileName - Name of the source KML file
+ */
+function updateKMLRoutesList(routes, fileName) {
+    const container = document.getElementById('kmlRoutesContainer');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <h4 class="text-green-800 font-semibold mb-2">📄 KML File Loaded</h4>
+            <p class="text-green-700 text-sm mb-2">
+                <strong>File:</strong> ${fileName}
+            </p>
+            <p class="text-green-700 text-sm mb-3">
+                <strong>Routes Found:</strong> ${routes.length}
+            </p>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="exportCurrentKMLRoutes()" 
+                        class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                    💾 Export Routes
+                </button>
+                <button onclick="convertKMLToSystemRoutes()" 
+                        class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                    ⚡ Import to System
+                </button>
+                <button onclick="clearKMLLayer()" 
+                        class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+                    🗑️ Clear KML
+                </button>
+            </div>
+        </div>
+        
+        <div class="space-y-2">
+            ${routes.map((route, index) => `
+                <div class="bg-white border rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h5 class="font-semibold" style="color: ${route.color || '#3b82f6'};">
+                            🚍 ${route.name}
+                        </h5>
+                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">
+                            ${route.stops ? route.stops.length : 0} stops
+                        </span>
+                    </div>
+                    ${route.description ? `
+                        <p class="text-sm text-gray-600 mb-2">${route.description}</p>
+                    ` : ''}
+                    <div class="flex flex-wrap gap-1">
+                        <button onclick="focusOnKMLRoute(${index})" 
+                                class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200">
+                            🎯 Focus
+                        </button>
+                        <button onclick="editKMLRoute(${index})" 
+                                class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs hover:bg-amber-200">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="exportSingleKMLRoute(${index})" 
+                                class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200">
+                            📤 Export
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+/**
+ * Generate KML content from route data
+ * @param {Array} routes - Array of route objects
+ * @param {string} title - Title for the KML document
+ * @returns {string} KML content
+ */
+function generateKMLFromRoutes(routes, title = 'Punjab Transport Routes') {
+    const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${title}</name>
+    <description>Bus routes exported from Punjab Transport Tracker</description>`;
+    
+    const kmlFooter = `
+  </Document>
+</kml>`;
+    
+    let kmlContent = kmlHeader;
+    
+    // Add styles
+    kmlContent += `
+    <Style id="routeStyle">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+    <Style id="stopStyle">
+      <IconStyle>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>`;
+    
+    // Add placemarks for each route
+    routes.forEach((route, index) => {
+        if (route.stops && route.stops.length > 0) {
+            // Add route line
+            kmlContent += `
+    <Placemark>
+      <name>${route.name || `Route ${index + 1}`}</name>
+      <description>${route.description || 'Bus route'}</description>
+      <styleUrl>#routeStyle</styleUrl>
+      <LineString>
+        <extrude>1</extrude>
+        <tessellate>1</tessellate>
+        <coordinates>`;
+            
+            // Add coordinates
+            route.stops.forEach(stop => {
+                kmlContent += `
+          ${stop.longitude},${stop.latitude},${stop.altitude || 0}`;
+            });
+            
+            kmlContent += `
+        </coordinates>
+      </LineString>
+    </Placemark>`;
+            
+            // Add stop markers
+            route.stops.forEach((stop, stopIndex) => {
+                kmlContent += `
+    <Placemark>
+      <name>${stop.name || `Stop ${stopIndex + 1}`}</name>
+      <description>Bus stop on route: ${route.name}</description>
+      <styleUrl>#stopStyle</styleUrl>
+      <Point>
+        <coordinates>${stop.longitude},${stop.latitude},${stop.altitude || 0}</coordinates>
+      </Point>
+    </Placemark>`;
+            });
+        }
+    });
+    
+    kmlContent += kmlFooter;
+    return kmlContent;
+}
+
+/**
+ * Export current KML routes to file
+ */
+function exportCurrentKMLRoutes() {
+    if (routeKmlData.length === 0) {
+        showNotification('No KML routes to export', 'warning');
+        return;
+    }
+    
+    const kmlContent = generateKMLFromRoutes(routeKmlData, 'Exported Punjab Transport Routes');
+    downloadKMLFile(kmlContent, 'punjab_transport_routes.kml');
+    showNotification('KML routes exported successfully', 'success');
+}
+
+/**
+ * Export single KML route
+ * @param {number} routeIndex - Index of route to export
+ */
+function exportSingleKMLRoute(routeIndex) {
+    if (!routeKmlData[routeIndex]) {
+        showNotification('Route not found', 'error');
+        return;
+    }
+    
+    const route = routeKmlData[routeIndex];
+    const kmlContent = generateKMLFromRoutes([route], route.name);
+    const fileName = `${route.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.kml`;
+    
+    downloadKMLFile(kmlContent, fileName);
+    showNotification(`Route "${route.name}" exported successfully`, 'success');
+}
+
+/**
+ * Download KML content as file
+ * @param {string} kmlContent - KML content to download
+ * @param {string} fileName - Name for the downloaded file
+ */
+function downloadKMLFile(kmlContent, fileName) {
+    const blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Focus map on specific KML route
+ * @param {number} routeIndex - Index of route to focus on
+ */
+function focusOnKMLRoute(routeIndex) {
+    const route = routeKmlData[routeIndex];
+    if (!route || !route.stops || route.stops.length === 0) {
+        showNotification('Route not found or has no stops', 'error');
+        return;
+    }
+    
+    if (googleMapsLoaded && adminMap) {
+        // Google Maps version
+        const bounds = new google.maps.LatLngBounds();
+        route.stops.forEach(stop => {
+            bounds.extend({ lat: stop.latitude, lng: stop.longitude });
+        });
+        adminMap.fitBounds(bounds);
+    } else if (adminMap) {
+        // Leaflet version
+        const bounds = L.latLngBounds(route.stops.map(stop => [stop.latitude, stop.longitude]));
+        adminMap.fitBounds(bounds, { padding: [20, 20] });
+    }
+    
+    showNotification(`Focused on route: ${route.name}`, 'info');
+}
+
+/**
+ * Convert KML routes to system routes
+ */
+function convertKMLToSystemRoutes() {
+    if (routeKmlData.length === 0) {
+        showNotification('No KML routes to convert', 'warning');
+        return;
+    }
+    
+    let convertedCount = 0;
+    
+    routeKmlData.forEach(kmlRoute => {
+        if (kmlRoute.stops && kmlRoute.stops.length > 0) {
+            // Create system route object
+            const systemRoute = {
+                id: 'imported_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                name: kmlRoute.name,
+                city: 'imported', // Default city - admin can change later
+                color: kmlRoute.color || '#3b82f6',
+                stops: kmlRoute.stops.map(stop => ({
+                    id: stop.id || `stop_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    name: stop.name,
+                    lat: stop.latitude,
+                    lng: stop.longitude,
+                    stopTime: stop.stopTime || 2
+                })),
+                type: 'imported_from_kml',
+                source: 'kml_import',
+                importedAt: new Date().toISOString(),
+                description: kmlRoute.description || ''
+            };
+            
+            // Add to routes (you would typically save this to your database)
+            allRoutes[systemRoute.id] = systemRoute;
+            convertedCount++;
+            
+            console.log('Converted KML route to system route:', systemRoute);
+        }
+    });
+    
+    if (convertedCount > 0) {
+        showNotification(`Successfully converted ${convertedCount} KML routes to system routes`, 'success');
+        // Refresh routes list
+        loadRoutes();
+    } else {
+        showNotification('No valid routes found to convert', 'warning');
+    }
+}
+
+/**
+ * Export system routes to KML format
+ */
+function exportSystemRoutesToKML() {
+    // Get current system routes
+    const systemRoutes = Object.values(allRoutes);
+    
+    if (systemRoutes.length === 0) {
+        showNotification('No system routes to export', 'warning');
+        return;
+    }
+    
+    // Convert to KML format
+    const kmlRoutes = systemRoutes.map(route => ({
+        id: route.id,
+        name: route.name || 'Unnamed Route',
+        description: route.description || `System route: ${route.name}`,
+        color: route.color || '#3b82f6',
+        stops: route.stops ? route.stops.map(stop => ({
+            id: stop.id,
+            name: stop.name,
+            latitude: stop.lat,
+            longitude: stop.lng,
+            altitude: 0,
+            stopTime: stop.stopTime || 2
+        })) : [],
+        source: 'system_export'
+    }));
+    
+    const kmlContent = generateKMLFromRoutes(kmlRoutes, 'Punjab Transport System Routes');
+    downloadKMLFile(kmlContent, 'punjab_transport_system_routes.kml');
+    
+    showNotification(`Exported ${systemRoutes.length} system routes to KML`, 'success');
+}
+
+/**
+ * Show KML help modal
+ */
+function showKMLHelp() {
+    const helpContent = `
+        <div class="space-y-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <h4 class="font-semibold text-blue-800 mb-2">🌍 Google Earth KML Integration</h4>
+                <p class="text-blue-700 text-sm">
+                    Import and export bus routes using Google Earth's KML format for advanced route planning and visualization.
+                </p>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <h5 class="font-semibold text-gray-800">📥 Importing KML Files</h5>
+                    <ul class="text-sm text-gray-600 mt-1 space-y-1">
+                        <li>• Create routes in Google Earth Pro</li>
+                        <li>• Save as KML file (.kml or .kmz)</li>
+                        <li>• Upload using the file picker above</li>
+                        <li>• Review and import routes to system</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h5 class="font-semibold text-gray-800">📤 Exporting to KML</h5>
+                    <ul class="text-sm text-gray-600 mt-1 space-y-1">
+                        <li>• Export current system routes</li>
+                        <li>• Open in Google Earth for 3D visualization</li>
+                        <li>• Share with stakeholders and planners</li>
+                        <li>• Use for satellite imagery route planning</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h5 class="font-semibold text-gray-800">✨ Benefits</h5>
+                    <ul class="text-sm text-gray-600 mt-1 space-y-1">
+                        <li>• Visual route planning with satellite imagery</li>
+                        <li>• 3D terrain visualization</li>
+                        <li>• Integration with Google Earth's measuring tools</li>
+                        <li>• Easy sharing and collaboration</li>
+                        <li>• Professional route documentation</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-amber-50 p-3 rounded">
+                    <h5 class="font-semibold text-amber-800">⚠️ Tips</h5>
+                    <ul class="text-sm text-amber-700 mt-1 space-y-1">
+                        <li>• Use LineString for route paths</li>
+                        <li>• Add Point markers for bus stops</li>
+                        <li>• Include descriptive names and details</li>
+                        <li>• Test routes before importing to system</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    showModal('Google Earth KML Help', helpContent);
+}
+
+/**
+ * Edit KML route (placeholder for future implementation)
+ * @param {number} routeIndex - Index of route to edit
+ */
+function editKMLRoute(routeIndex) {
+    const route = routeKmlData[routeIndex];
+    if (!route) {
+        showNotification('Route not found', 'error');
+        return;
+    }
+    
+    // For now, just show route details
+    const routeDetails = `
+        <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Route Name</label>
+                    <input type="text" value="${route.name}" class="w-full p-2 border rounded" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Number of Stops</label>
+                    <input type="text" value="${route.stops ? route.stops.length : 0}" class="w-full p-2 border rounded" readonly>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Description</label>
+                <textarea class="w-full p-2 border rounded" rows="3" readonly>${route.description || 'No description'}</textarea>
+            </div>
+            <div class="bg-blue-50 p-3 rounded">
+                <p class="text-blue-700 text-sm">
+                    🚧 Route editing will be available in a future update. For now, you can export this route to KML, 
+                    edit it in Google Earth, and re-import it.
+                </p>
+            </div>
+        </div>
+    `;
+    
+    showModal(`Edit Route: ${route.name}`, routeDetails);
+}
+
+/**
+ * Show generic modal
+ * @param {string} title - Modal title
+ * @param {string} content - Modal content HTML
+ */
+function showModal(title, content) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('genericModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'genericModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+                <h3 class="text-xl font-semibold">${title}</h3>
+                <button onclick="document.getElementById('genericModal').remove()" 
+                        class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                ${content}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+/**
+ * Update KML status display
+ * @param {string} message - Status message
+ * @param {string} type - Status type (success, error, info)
+ */
+function updateKMLStatus(message, type = 'info') {
+    const statusElement = document.getElementById('kmlStatus');
+    if (!statusElement) return;
+    
+    const colors = {
+        success: 'text-green-600',
+        error: 'text-red-600',
+        warning: 'text-yellow-600',
+        info: 'text-gray-500'
+    };
+    
+    statusElement.className = `text-xs text-center ${colors[type] || colors.info}`;
+    statusElement.textContent = message;
 }
 
 function showAdminLogin() {
@@ -624,12 +1542,263 @@ function removeBusFromMap(driverId) {
 function addBusToList(bus) {
     const list = document.getElementById('activeBusesList');
     const item = document.createElement('div');
-    item.className = 'p-2 border-b hover:bg-gray-50';
+    
+    // Determine city based on route or default to 'unknown'
+    let busCity = 'unknown';
+    if (bus.routeId) {
+        // Try to find the city by checking which city contains this route
+        for (const [cityId, routes] of Object.entries(PTTConfig?.data?.routes || {})) {
+            if (Array.isArray(routes) && routes.some(route => route.id === bus.routeId)) {
+                busCity = cityId;
+                break;
+            }
+        }
+    }
+    
+    // Get city display name
+    const cityDisplayName = PTTConfig?.data?.cities?.[busCity]?.name || busCity;
+    
+    item.className = 'bus-item p-3 border-b hover:bg-gray-50 transition-all duration-200';
+    item.dataset.city = busCity; // Add city data attribute for filtering
+    item.dataset.busId = bus.busNumber;
+    
+    // Determine status color and icon
+    const statusIcon = bus.isActive ? 
+        '<i class="fas fa-circle text-green-500 text-xs"></i>' : 
+        '<i class="fas fa-circle text-red-500 text-xs"></i>';
+    
+    const lastUpdateTime = bus.timestamp ? 
+        new Date(bus.timestamp).toLocaleTimeString('en-IN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        }) : 'Unknown';
+    
     item.innerHTML = `
-        <p class="font-semibold">${bus.busNumber} <span class="text-xs text-gray-500">(${bus.driverId})</span></p>
-        <p class="text-sm text-gray-600">Speed: ${bus.speed} km/h</p>
+        <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center space-x-2">
+                <p class="font-semibold text-gray-800">
+                    <i class="fas fa-bus text-blue-600 mr-1"></i>
+                    ${bus.busNumber}
+                </p>
+                ${statusIcon}
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                    ${cityDisplayName}
+                </span>
+                <span class="text-sm font-medium text-green-600">
+                    ${bus.speed || 0} km/h
+                </span>
+            </div>
+        </div>
+        <div class="flex items-center justify-between text-sm text-gray-600">
+            <span>
+                <i class="fas fa-user-tie text-gray-400 mr-1"></i>
+                Driver: ${bus.driverId || 'Unknown'}
+            </span>
+            <span class="text-xs text-gray-500">
+                <i class="fas fa-clock text-gray-400 mr-1"></i>
+                ${lastUpdateTime}
+            </span>
+        </div>
+        ${bus.routeId ? `
+            <div class="mt-2 text-xs text-gray-500">
+                <i class="fas fa-route text-gray-400 mr-1"></i>
+                Route: ${bus.routeId}
+            </div>
+        ` : ''}
     `;
+    
+    // Add click handler for bus details
+    item.addEventListener('click', () => {
+        showBusDetails(bus, busCity);
+    });
+    
+    // Add hover effect
+    item.addEventListener('mouseenter', () => {
+        item.classList.add('bg-blue-50', 'shadow-sm');
+        // Highlight bus on map if marker exists
+        if (busMarkers[bus.driverId]) {
+            highlightBusOnMap(bus.driverId);
+        }
+    });
+    
+    item.addEventListener('mouseleave', () => {
+        item.classList.remove('bg-blue-50', 'shadow-sm');
+        // Remove highlight from map
+        if (busMarkers[bus.driverId]) {
+            removeHighlightFromMap(bus.driverId);
+        }
+    });
+    
     list.appendChild(item);
+}
+
+/**
+ * Show detailed information about a bus
+ * @param {Object} bus - Bus data object
+ * @param {string} cityId - City identifier
+ */
+function showBusDetails(bus, cityId) {
+    const cityName = PTTConfig?.data?.cities?.[cityId]?.name || cityId;
+    
+    const detailsContent = `
+        <div class="space-y-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <h4 class="font-semibold text-blue-800 mb-2">
+                    <i class="fas fa-bus mr-2"></i>
+                    Bus ${bus.busNumber}
+                </h4>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <span class="font-medium text-gray-700">Status:</span>
+                        <span class="ml-2 ${bus.isActive ? 'text-green-600' : 'text-red-600'}">
+                            ${bus.isActive ? '🟢 Active' : '🔴 Inactive'}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">Speed:</span>
+                        <span class="ml-2 text-green-600 font-medium">${bus.speed || 0} km/h</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">City:</span>
+                        <span class="ml-2 text-blue-600">${cityName}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">Route:</span>
+                        <span class="ml-2 text-purple-600">${bus.routeId || 'Not assigned'}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-green-50 p-4 rounded-lg">
+                <h5 class="font-semibold text-green-800 mb-2">
+                    <i class="fas fa-user-tie mr-2"></i>
+                    Driver Information
+                </h5>
+                <div class="text-sm text-green-700">
+                    <p><span class="font-medium">Driver ID:</span> ${bus.driverId || 'Unknown'}</p>
+                    <p><span class="font-medium">Last Update:</span> ${bus.timestamp ? new Date(bus.timestamp).toLocaleString('en-IN') : 'Unknown'}</p>
+                </div>
+            </div>
+            
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <h5 class="font-semibold text-yellow-800 mb-2">
+                    <i class="fas fa-map-marker-alt mr-2"></i>
+                    Location Details
+                </h5>
+                <div class="text-sm text-yellow-700">
+                    <p><span class="font-medium">Latitude:</span> ${bus.latitude?.toFixed(6) || 'Unknown'}</p>
+                    <p><span class="font-medium">Longitude:</span> ${bus.longitude?.toFixed(6) || 'Unknown'}</p>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button onclick="focusOnBusOnMap('${bus.driverId}')" 
+                            class="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">
+                        📍 Focus on Map
+                    </button>
+                    <button onclick="trackBusRoute('${bus.routeId}')" 
+                            class="px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600">
+                        🛣️ Show Route
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    showModal(`Bus Details - ${bus.busNumber}`, detailsContent);
+}
+
+/**
+ * Highlight bus marker on map
+ * @param {string} driverId - Driver/Bus identifier
+ */
+function highlightBusOnMap(driverId) {
+    const marker = busMarkers[driverId];
+    if (!marker) return;
+    
+    // Different highlighting for different map types
+    if (marker.setIcon) {
+        // Leaflet marker
+        const highlightIcon = L.divIcon({ 
+            className: 'bus-marker-admin bus-marker-highlight', 
+            html: 'B', 
+            iconSize: [30, 30] 
+        });
+        marker.setIcon(highlightIcon);
+    }
+}
+
+/**
+ * Remove highlight from bus marker on map
+ * @param {string} driverId - Driver/Bus identifier
+ */
+function removeHighlightFromMap(driverId) {
+    const marker = busMarkers[driverId];
+    if (!marker) return;
+    
+    if (marker.setIcon) {
+        // Leaflet marker - reset to normal icon
+        const normalIcon = L.divIcon({ 
+            className: 'bus-marker-admin', 
+            html: 'B', 
+            iconSize: [25, 25] 
+        });
+        marker.setIcon(normalIcon);
+    }
+}
+
+/**
+ * Focus map on specific bus
+ * @param {string} driverId - Driver/Bus identifier
+ */
+function focusOnBusOnMap(driverId) {
+    const marker = busMarkers[driverId];
+    if (!marker) {
+        showNotification('Bus not found on map', 'error');
+        return;
+    }
+    
+    // Focus on the bus location
+    if (adminMap.setView) {
+        // Leaflet
+        const latlng = marker.getLatLng();
+        adminMap.setView(latlng, 15);
+    } else if (adminMap.setCenter) {
+        // Google Maps
+        const position = marker.getPosition();
+        adminMap.setCenter(position);
+        adminMap.setZoom(15);
+    }
+    
+    // Open popup/info window
+    if (marker.openPopup) {
+        marker.openPopup();
+    }
+    
+    // Close modal
+    const modal = document.getElementById('genericModal');
+    if (modal) modal.remove();
+    
+    showNotification('Focused on bus location', 'success');
+}
+
+/**
+ * Track and display bus route
+ * @param {string} routeId - Route identifier
+ */
+function trackBusRoute(routeId) {
+    if (!routeId) {
+        showNotification('No route assigned to this bus', 'warning');
+        return;
+    }
+    
+    // This function would display the full route on the map
+    console.log(`Tracking route: ${routeId}`);
+    showNotification(`Tracking route: ${routeId}`, 'info');
+    
+    // Close modal
+    const modal = document.getElementById('genericModal');
+    if (modal) modal.remove();
 }
 
 function showAllBuses() {
@@ -659,9 +1828,297 @@ function filterByCity() {
     const cityFilter = document.getElementById('cityFilter').value;
     console.log('Filtering by city:', cityFilter);
     
-    // This would filter the active buses list by city
-    // For now, just update the dashboard
+    // Remove any existing active styling first
+    const cityFilterElement = document.getElementById('cityFilter');
+    if (cityFilterElement) {
+        cityFilterElement.classList.remove('city-filter-active');
+    }
+    
+    // Load city-specific map if a specific city is selected
+    if (cityFilter !== 'all') {
+        loadCitySpecificMap(cityFilter);
+    } else {
+        // Reset to default Punjab view
+        resetToDefaultMapView();
+    }
+    
+    // Filter the active buses list by city
+    filterActiveBusesByCity(cityFilter);
+    
+    // Update dashboard with filtered data
     updateDashboard();
+}
+
+/**
+ * Load city-specific map view with OSM tiles
+ * @param {string} cityId - The city identifier
+ */
+function loadCitySpecificMap(cityId) {
+    console.log(`🏙️ Loading map for city: ${cityId}`);
+    
+    // Get city configuration from PTTConfig
+    const cityConfig = PTTConfig?.data?.cities?.[cityId];
+    
+    if (!cityConfig) {
+        console.error(`City configuration not found for: ${cityId}`);
+        showNotification(`City "${cityId}" not found in configuration`, 'error');
+        return;
+    }
+    
+    console.log(`📍 City coordinates:`, cityConfig.coordinates);
+    
+    // Update map view based on map type
+    if (googleMapsLoaded && adminMap && adminMap.setCenter) {
+        // Google Maps
+        console.log('🗺️ Updating Google Maps view to city');
+        adminMap.setCenter({
+            lat: cityConfig.coordinates.lat,
+            lng: cityConfig.coordinates.lng
+        });
+        adminMap.setZoom(cityConfig.zoom || 12);
+        
+        // Optionally switch to a more detailed map type for city view
+        adminMap.setMapTypeId('roadmap'); // Switch to roadmap for better city details
+        
+    } else if (adminMap && adminMap.setView) {
+        // Leaflet Map
+        console.log('🗺️ Updating Leaflet map view to city');
+        adminMap.setView(
+            [cityConfig.coordinates.lat, cityConfig.coordinates.lng], 
+            cityConfig.zoom || 12
+        );
+        
+        // Optionally change tile layer for better city view
+        updateLeafletTileLayerForCity(cityId);
+    }
+    
+    // Update map title
+    updateMapTitle(cityConfig.name);
+    
+    // Show notification
+    showNotification(`Map updated to show ${cityConfig.name}`, 'success');
+}
+
+/**
+ * Update Leaflet tile layer for better city visualization
+ * @param {string} cityId - The city identifier
+ */
+function updateLeafletTileLayerForCity(cityId) {
+    if (!adminMap || !adminMap.eachLayer) return;
+    
+    // Define city-specific tile layer configurations
+    const cityTileConfigs = {
+        chandigarh: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        ludhiana: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        amritsar: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        jalandhar: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        patiala: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        bathinda: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        mohali: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        },
+        pathankot: {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            options: { maxZoom: 18, className: 'city-tiles' }
+        }
+    };
+    
+    const tileConfig = cityTileConfigs[cityId];
+    if (!tileConfig) {
+        console.log(`No specific tile configuration for ${cityId}, using default`);
+        return;
+    }
+    
+    // Remove existing tile layers
+    adminMap.eachLayer(function(layer) {
+        if (layer instanceof L.TileLayer) {
+            adminMap.removeLayer(layer);
+        }
+    });
+    
+    // Add new tile layer for the city
+    const newTileLayer = L.tileLayer(tileConfig.url, {
+        attribution: tileConfig.attribution,
+        ...tileConfig.options
+    });
+    
+    newTileLayer.addTo(adminMap);
+    
+    console.log(`🌍 Tile layer updated for ${cityId}`);
+}
+
+/**
+ * Reset map to default Punjab view
+ */
+function resetToDefaultMapView() {
+    console.log('🏞️ Resetting map to default Punjab view');
+    
+    const defaultConfig = PTTConfig?.app?.map || {
+        defaultCenter: { lat: 31.1471, lng: 75.3412 },
+        defaultZoom: 8
+    };
+    
+    if (googleMapsLoaded && adminMap && adminMap.setCenter) {
+        // Google Maps
+        adminMap.setCenter({
+            lat: defaultConfig.defaultCenter.lat,
+            lng: defaultConfig.defaultCenter.lng
+        });
+        adminMap.setZoom(defaultConfig.defaultZoom);
+        adminMap.setMapTypeId('hybrid'); // Reset to hybrid view for state overview
+        
+    } else if (adminMap && adminMap.setView) {
+        // Leaflet Map
+        adminMap.setView(
+            [defaultConfig.defaultCenter.lat, defaultConfig.defaultCenter.lng], 
+            defaultConfig.defaultZoom
+        );
+        
+        // Reset to default tile layer
+        resetToDefaultTileLayer();
+    }
+    
+    // Update map title
+    updateMapTitle('Punjab State');
+    
+    showNotification('Map reset to Punjab state view', 'info');
+}
+
+/**
+ * Reset Leaflet to default tile layer
+ */
+function resetToDefaultTileLayer() {
+    if (!adminMap || !adminMap.eachLayer) return;
+    
+    // Remove existing tile layers
+    adminMap.eachLayer(function(layer) {
+        if (layer instanceof L.TileLayer) {
+            adminMap.removeLayer(layer);
+        }
+    });
+    
+    // Add default OSM tile layer
+    const defaultTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18
+    });
+    
+    defaultTileLayer.addTo(adminMap);
+    
+    console.log('🌍 Reset to default tile layer');
+}
+
+/**
+ * Update map title in the UI
+ * @param {string} location - The location name to display
+ */
+function updateMapTitle(location) {
+    const mapTitleElement = document.querySelector('#adminMap').closest('.bg-white').querySelector('h3');
+    if (mapTitleElement) {
+        mapTitleElement.innerHTML = `<i class="fas fa-map mr-2"></i> Live Bus Tracking - ${location}`;
+    }
+    
+    // Update city filter visual feedback
+    updateCityFilterVisual(location);
+}
+
+/**
+ * Update visual feedback for city filter
+ * @param {string} locationName - The selected location name
+ */
+function updateCityFilterVisual(locationName) {
+    const cityFilter = document.getElementById('cityFilter');
+    if (!cityFilter) return;
+    
+    // Add visual feedback to show active city (only for specific cities, not "All Cities")
+    if (locationName === 'Punjab State' || locationName === 'All Cities') {
+        cityFilter.classList.remove('city-filter-active');
+        cityFilter.value = 'all';
+    } else {
+        // Only apply active styling for specific cities
+        cityFilter.classList.add('city-filter-active');
+    }
+    
+    // Add map visual feedback
+    const mapContainer = document.getElementById('adminMap');
+    if (mapContainer) {
+        if (locationName !== 'Punjab State' && locationName !== 'All Cities') {
+            mapContainer.classList.add('city-map-active');
+        } else {
+            mapContainer.classList.remove('city-map-active');
+        }
+    }
+}
+
+/**
+ * Filter active buses list by city
+ * @param {string} cityFilter - The city filter value
+ */
+function filterActiveBusesByCity(cityFilter) {
+    const busList = document.getElementById('activeBusesList');
+    if (!busList) return;
+    
+    // Get all bus elements
+    const busElements = busList.querySelectorAll('.bus-item');
+    
+    busElements.forEach(busElement => {
+        const busCity = busElement.dataset.city;
+        
+        if (cityFilter === 'all' || busCity === cityFilter) {
+            busElement.style.display = 'block';
+        } else {
+            busElement.style.display = 'none';
+        }
+    });
+    
+    // Update visible count
+    const visibleBuses = Array.from(busElements).filter(el => el.style.display !== 'none');
+    console.log(`📊 Showing ${visibleBuses.length} buses for city filter: ${cityFilter}`);
+    
+    // Optionally update the count display
+    updateFilteredBusCount(visibleBuses.length, cityFilter);
+}
+
+/**
+ * Update the displayed count of filtered buses
+ * @param {number} count - Number of visible buses
+ * @param {string} cityFilter - Current city filter
+ */
+function updateFilteredBusCount(count, cityFilter) {
+    const countElement = document.getElementById('activeBusCount');
+    if (countElement) {
+        const cityName = cityFilter === 'all' ? 'All Cities' : 
+                        PTTConfig?.data?.cities?.[cityFilter]?.name || cityFilter;
+        countElement.textContent = count;
+        countElement.title = `${count} active buses in ${cityName}`;
+    }
 }
 
 function filterByStatus() {
