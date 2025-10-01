@@ -528,7 +528,7 @@
             <div class="p-4 border-b flex-shrink-0 bg-blue-50">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-bold text-gray-800">
-                        <i class="fas fa-plus-circle mr-2 text-blue-500"></i> Create New City Bus Route
+                        <i class="fas fa-plus-circle mr-2 text-blue-500"></i> Create New Bus Route
                         <span id="kmlIndicator" class="hidden ml-4 text-sm font-normal text-green-600">
                             <i class="fas fa-file-code mr-1"></i> KML Data Available
                         </span>
@@ -536,6 +536,12 @@
                     <button onclick="closeCreateRouteModal()" class="text-gray-500 hover:text-gray-700 text-xl p-2 hover:bg-gray-100 rounded">
                         <i class="fas fa-times"></i>
                     </button>
+                </div>
+                <div class="mt-2">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
+                        <strong>Workflow:</strong> Upload a KML file from Google Earth to see your plotted route, then click anywhere on the map to add custom bus stops.
+                    </p>
                 </div>
             </div>
             
@@ -591,27 +597,12 @@
                         </div>
                     </div>
                     
-                    <!-- Route Stops Section -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-map-pin mr-2"></i> Route Stops
-                            </h3>
-                            <button type="button" onclick="addRouteStop()" class="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition text-sm">
-                                <i class="fas fa-plus mr-1"></i> Add Stop
-                            </button>
-                        </div>
-                        <div id="routeStopsList" class="space-y-2 max-h-40 overflow-y-auto">
-                            <p class="text-gray-500 text-sm">Click "Add Stop" or click on the map below to add bus stops</p>
-                        </div>
-                    </div>
-                    
-                    <!-- KML Import Section -->
+                    <!-- KML Upload Section -->
                     <div class="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-file-code mr-2 text-green-600"></i> KML Route Import
-                                <span class="text-sm font-normal text-gray-600 ml-2">(Optional - for reference)</span>
+                                <i class="fas fa-file-code mr-2 text-green-600"></i> Step 1: Upload KML File from Google Earth
+                                <span class="text-sm font-normal text-gray-600 ml-2">- Import your route data</span>
                             </h3>
                             <button type="button" id="clearKmlBtn" onclick="clearKMLDataFromModal()" class="hidden bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">
                                 <i class="fas fa-trash mr-1"></i> Clear KML
@@ -619,14 +610,19 @@
                         </div>
                         
                         <!-- KML Upload Area -->
-                        <div id="kmlUploadArea" class="border-2 border-dashed border-green-300 rounded-lg p-4 text-center">
-                            <i class="fas fa-cloud-upload-alt text-3xl text-green-600 mb-2"></i>
-                            <p class="text-sm text-gray-600 mb-2">Upload KML file for route reference</p>
+                        <div id="kmlUploadArea" class="border-2 border-dashed border-green-300 rounded-lg p-6 text-center hover:border-green-400 transition">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-green-600 mb-3"></i>
+                            <h4 class="text-lg font-semibold text-gray-700 mb-2">Upload KML File from Google Earth</h4>
+                            <p class="text-sm text-gray-600 mb-2">Upload your Google Earth KML file to automatically display the route on the map below</p>
+                            <p class="text-xs text-gray-500 mb-4">The route will be plotted automatically, then you can click anywhere to add bus stops</p>
                             <input type="file" id="modalKmlFileUpload" accept=".kml,.kmz" class="hidden">
                             <button type="button" onclick="document.getElementById('modalKmlFileUpload').click()" 
-                                    class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm">
+                                    class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition text-sm font-semibold">
                                 <i class="fas fa-file-upload mr-2"></i> Select KML File
                             </button>
+                            <div class="mt-3 text-xs text-gray-500">
+                                Supported formats: .kml, .kmz
+                            </div>
                         </div>
                         
                         <!-- KML Display Area -->
@@ -634,27 +630,43 @@
                             <!-- KML routes info will be displayed here -->
                         </div>
                     </div>
+
                     
                     <!-- Interactive Map -->
                     <div class="bg-gray-50 p-4 rounded-lg">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-map mr-2"></i> Route Map
-                                <span class="text-sm text-gray-600 font-normal ml-2">(Click on map to add stops)</span>
+                                <i class="fas fa-map mr-2"></i> Step 2: Route Visualization & Bus Stop Management
+                                <span class="text-sm text-gray-600 font-normal ml-2">(Click anywhere to add bus stops)</span>
                             </h3>
                             <div class="flex space-x-2">
                                 <button type="button" onclick="testMapClick()" class="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition">
                                     <i class="fas fa-mouse-pointer mr-1"></i> Test Click
                                 </button>
                                 <button type="button" onclick="clearRouteData()" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">
-                                    <i class="fas fa-trash mr-1"></i> Clear
+                                    <i class="fas fa-trash mr-1"></i> Clear Stops
                                 </button>
                             </div>
                         </div>
-                        <div id="routeCreationMap" class="h-64 border rounded-lg bg-gray-200"></div>
+                        <div id="routeCreationMap" class="h-80 border rounded-lg bg-gray-200"></div>
                         <div class="mt-2 text-xs text-gray-600">
                             <i class="fas fa-info-circle mr-1"></i>
-                            Select a city above to center the map, then click anywhere to add bus stops
+                            <strong>How to use:</strong> Upload a KML file above to see your route, then click anywhere on the map to add bus stops with custom names.
+                        </div>
+                    </div>
+                    
+                    <!-- Route Stops Section -->
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-map-pin mr-2"></i> Step 3: Manage Bus Stops
+                            </h3>
+                            <button type="button" onclick="addRouteStop()" class="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition text-sm">
+                                <i class="fas fa-plus mr-1"></i> Add Stop Manually
+                            </button>
+                        </div>
+                        <div id="routeStopsList" class="space-y-2 max-h-40 overflow-y-auto">
+                            <p class="text-gray-500 text-sm">🗺️ Upload a KML file above to get started, then click anywhere on the map to add bus stops.</p>
                         </div>
                     </div>
                     

@@ -188,6 +188,13 @@ function initializeGoogleRouteCreationMap() {
             const lng = event.latLng.lng();
             console.log('🎯 Google Map clicked at coordinates:', lat.toFixed(6), lng.toFixed(6));
             
+            // Check if we're editing an existing stop
+            if (window.editingStopIndex !== null && window.editingStopIndex !== undefined) {
+                updateExistingStop(window.editingStopIndex, lat, lng);
+                cancelStopEdit();
+                return;
+            }
+            
             // Visual feedback
             const clickMarker = new google.maps.Marker({
                 position: { lat, lng },
@@ -255,21 +262,30 @@ function updateGoogleRouteVisualization() {
 
     console.log('Updating Google Maps route visualization...');
     
-    // Clear existing markers and polylines (Google Maps version)
-    // Note: In a production app, you'd keep track of these in arrays
+    // Clear existing route markers and polylines
+    if (window.routeVisualizationMarkers) {
+        window.routeVisualizationMarkers.forEach(marker => marker.setMap(null));
+    }
+    if (window.routeVisualizationPolylines) {
+        window.routeVisualizationPolylines.forEach(polyline => polyline.setMap(null));
+    }
+    window.routeVisualizationMarkers = [];
+    window.routeVisualizationPolylines = [];
     
     // Add markers for stops with coordinates
     const validStops = routeStops.filter(stop => stop.latitude && stop.longitude);
     console.log('Valid stops for Google Maps visualization:', validStops.length);
     
     validStops.forEach((stop, index) => {
+        const stopNumber = index + 1; // Sequential numbering
+        
         // Create custom marker for each stop
         const marker = new google.maps.Marker({
             position: { lat: stop.latitude, lng: stop.longitude },
             map: routeCreationMap,
-            title: `Stop ${index + 1}: ${stop.name || 'Unnamed Stop'}`,
+            title: `Stop ${stopNumber}: ${stop.name || 'Unnamed Stop'}`,
             label: {
-                text: (index + 1).toString(),
+                text: stopNumber.toString(),
                 color: 'white',
                 fontWeight: 'bold'
             },
@@ -283,20 +299,48 @@ function updateGoogleRouteVisualization() {
             }
         });
         
-        // Add info window
+        // Add info window with edit/delete options
         const infoWindow = new google.maps.InfoWindow({
             content: `
-                <div style="padding: 8px;">
-                    <h4 style="margin: 0 0 4px 0; color: #ef4444;">🚏 Stop ${index + 1}</h4>
-                    <p style="margin: 2px 0; font-size: 12px;"><strong>Name:</strong> ${stop.name || 'Unnamed Stop'}</p>
-                    <p style="margin: 2px 0; font-size: 12px;"><strong>Coordinates:</strong> ${stop.latitude.toFixed(6)}, ${stop.longitude.toFixed(6)}</p>
+                <div style="padding: 12px; min-width: 200px;">
+                    <h4 style="margin: 0 0 8px 0; color: #ef4444; display: flex; align-items: center;">
+                        <div style="width: 24px; height: 24px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 12px; font-weight: bold;">
+                            ${stopNumber}
+                        </div>
+                        ${stop.name || `Stop ${stopNumber}`}
+                    </h4>
+                    <div style="margin-bottom: 8px; padding: 8px; background: #f8fafc; border-radius: 4px;">
+                        <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;"><strong>Bus Stop Number:</strong></div>
+                        <div style="font-size: 14px; font-weight: bold; color: #1d4ed8;">Stop ${stopNumber}</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 12px;">
+                        <button onclick="editStopName(${index})" 
+                                style="flex: 1; background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-edit"></i> Edit Name
+                        </button>
+                        <button onclick="editStopOnMap(${index})" 
+                                style="flex: 1; background: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-crosshairs"></i> Move
+                        </button>
+                        <button onclick="removeRouteStop(${index})" 
+                                style="flex: 1; background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
                 </div>
             `
         });
         
         marker.addListener('click', () => {
+            // Close any open info windows
+            if (window.currentInfoWindow) {
+                window.currentInfoWindow.close();
+            }
             infoWindow.open(routeCreationMap, marker);
+            window.currentInfoWindow = infoWindow;
         });
+        
+        window.routeVisualizationMarkers.push(marker);
     });
     
     // Draw route polyline if we have multiple stops
@@ -315,6 +359,7 @@ function updateGoogleRouteVisualization() {
         });
         
         routePolyline.setMap(routeCreationMap);
+        window.routeVisualizationPolylines.push(routePolyline);
         
         // Fit map to show all stops
         const bounds = new google.maps.LatLngBounds();
@@ -331,6 +376,19 @@ function updateGoogleRouteVisualization() {
             lng: validStops[0].longitude
         });
         routeCreationMap.setZoom(15);
+    }
+}
+
+// Function to edit stop name inline
+function editStopName(stopIndex) {
+    const stop = routeStops[stopIndex];
+    if (!stop) return;
+    
+    const newName = prompt(`Enter new name for Stop ${stopIndex + 1}:`, stop.name || '');
+    if (newName !== null && newName.trim() !== '') {
+        updateStopName(stopIndex, newName.trim());
+        updateRouteVisualization(); // Refresh to show updated name
+        showNotification(`Stop name updated to "${newName.trim()}"`, 'success');
     }
 }
 
@@ -1109,7 +1167,7 @@ function parseKMLForModal(kmlContent, fileName) {
             // Store for later use when map is initialized
             window.modalKmlData = modalKmlRoutes;
             
-            showNotification(`Successfully loaded ${modalKmlRoutes.length} routes from ${fileName}`, 'success');
+            showNotification(`✅ KML file loaded successfully! ${modalKmlRoutes.length} route(s) plotted on map. Click anywhere to add bus stops.`, 'success');
         } else {
             showNotification('No valid routes found in KML file', 'warning');
         }
@@ -1129,6 +1187,7 @@ function displayKMLInModal(routes, fileName) {
     const kmlUploadArea = document.getElementById('kmlUploadArea');
     const modalKmlDisplay = document.getElementById('modalKmlDisplay');
     const clearKmlBtn = document.getElementById('clearKmlBtn');
+    const kmlIndicator = document.getElementById('kmlIndicator');
     
     if (!modalKmlDisplay) {
         console.error('Modal KML display area not found');
@@ -1140,49 +1199,108 @@ function displayKMLInModal(routes, fileName) {
     modalKmlDisplay.classList.remove('hidden');
     if (clearKmlBtn) clearKmlBtn.classList.remove('hidden');
     
+    // Show KML indicator in modal header
+    if (kmlIndicator) {
+        kmlIndicator.classList.remove('hidden');
+        kmlIndicator.innerHTML = `<i class="fas fa-file-code mr-1"></i> KML Loaded: ${routes.length} route${routes.length > 1 ? 's' : ''}`;
+    }
+    
     modalKmlDisplay.innerHTML = `
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h4 class="font-semibold text-green-800">
-                    <i class="fas fa-check-circle mr-2"></i> KML File Loaded Successfully
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="font-semibold text-green-800 flex items-center">
+                    <i class="fas fa-check-circle mr-2 text-green-600 text-lg"></i> 
+                    KML Route Successfully Loaded & Plotted
                 </h4>
-                <button onclick="clearKMLDataFromModal()" class="text-green-600 hover:text-green-800">
-                    <i class="fas fa-times"></i>
+                <button onclick="clearKMLDataFromModal()" class="text-green-600 hover:text-green-800 transition">
+                    <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
             
-            <div class="text-sm text-green-700 mb-3">
-                <p><strong>File:</strong> ${fileName}</p>
-                <p><strong>Routes Found:</strong> ${routes.length}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-white rounded-lg p-4 border border-green-200">
+                    <div class="text-sm text-green-700">
+                        <p class="flex items-center mb-2">
+                            <i class="fas fa-file text-green-600 mr-2"></i>
+                            <strong>File:</strong> <span class="ml-1 font-mono text-xs bg-green-100 px-2 py-1 rounded">${fileName}</span>
+                        </p>
+                        <p class="flex items-center">
+                            <i class="fas fa-route text-green-600 mr-2"></i>
+                            <strong>Routes Found:</strong> <span class="ml-1 font-bold text-green-800 text-lg">${routes.length}</span>
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h5 class="text-sm font-semibold text-blue-800 mb-2">
+                        <i class="fas fa-arrow-right mr-1"></i> Next Steps
+                    </h5>
+                    <ul class="text-xs text-blue-700 space-y-1">
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2 font-bold">1.</span>
+                            Your route is now plotted on the map below
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2 font-bold">2.</span>
+                            Click anywhere on the map to add bus stops
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2 font-bold">3.</span>
+                            Each click opens a popup to name your stop
+                        </li>
+                    </ul>
+                </div>
             </div>
             
-            <div class="space-y-2 max-h-32 overflow-y-auto">
+            <div class="space-y-3 max-h-32 overflow-y-auto mb-4">
                 ${routes.map((route, index) => `
-                    <div class="bg-white border border-green-200 rounded p-2">
-                        <div class="flex items-center justify-between">
-                            <span class="font-medium text-sm" style="color: ${route.color || '#ef4444'};">
-                                🚍 ${route.name}
-                            </span>
-                            <span class="text-xs bg-green-100 px-2 py-1 rounded">
-                                ${route.stops ? route.stops.length : 0} stops
-                            </span>
+                    <div class="bg-white border border-green-200 rounded-lg p-3 transition hover:shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 rounded-full mr-3" style="background-color: ${route.color || '#ff6b6b'};"></div>
+                                <span class="font-medium text-sm">
+                                    🚍 ${route.name}
+                                </span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                    ${route.stops ? route.stops.length : 0} points
+                                </span>
+                                <button onclick="focusOnKMLRouteInModal(${index})" 
+                                        class="text-blue-600 hover:text-blue-800 text-xs" title="Focus on map">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                            </div>
                         </div>
                         ${route.description ? `
-                            <p class="text-xs text-gray-600 mt-1">${route.description}</p>
+                            <p class="text-xs text-gray-600 mt-1 italic">${route.description}</p>
                         ` : ''}
                     </div>
                 `).join('')}
             </div>
             
-            <div class="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                <p class="text-xs text-blue-700">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    <strong>Reference Mode:</strong> KML routes are displayed on the map as reference (red/pink lines). 
-                    You can still create your own route normally by clicking on the map.
-                </p>
+            <div class="pt-3 border-t border-green-200">
+                <div class="flex items-center justify-between">
+                    <p class="text-sm text-green-700 flex items-center font-medium">
+                        <i class="fas fa-map-marked-alt mr-2"></i>
+                        Route is plotted below! Click anywhere to start adding bus stops.
+                    </p>
+                    <button onclick="clearKMLDataFromModal()" 
+                            class="text-xs bg-red-100 text-red-700 px-3 py-2 rounded-lg hover:bg-red-200 transition">
+                        <i class="fas fa-trash mr-1"></i> Clear & Upload New
+                    </button>
+                </div>
             </div>
         </div>
     `;
+    
+    // Automatically scroll to the map section
+    setTimeout(() => {
+        const mapSection = document.getElementById('routeCreationMap');
+        if (mapSection) {
+            mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 500);
 }
 
 /**
@@ -1195,6 +1313,7 @@ function clearKMLDataFromModal() {
     const modalKmlDisplay = document.getElementById('modalKmlDisplay');
     const clearKmlBtn = document.getElementById('clearKmlBtn');
     const modalKmlUpload = document.getElementById('modalKmlFileUpload');
+    const kmlIndicator = document.getElementById('kmlIndicator');
     
     // Reset file input
     if (modalKmlUpload) {
@@ -1206,6 +1325,11 @@ function clearKMLDataFromModal() {
     if (modalKmlDisplay) modalKmlDisplay.classList.add('hidden');
     if (clearKmlBtn) clearKmlBtn.classList.add('hidden');
     
+    // Hide KML indicator
+    if (kmlIndicator) {
+        kmlIndicator.classList.add('hidden');
+    }
+    
     // Clear KML routes from map
     if (routeCreationMap) {
         clearKMLRoutesFromRouteCreationMap();
@@ -1214,7 +1338,52 @@ function clearKMLDataFromModal() {
     // Clear stored data
     window.modalKmlData = null;
     
-    showNotification('KML data cleared from route creation', 'info');
+    // Reset instructions in stops list
+    const stopsList = document.getElementById('routeStopsList');
+    if (stopsList && routeStops.length === 0) {
+        stopsList.innerHTML = '<p class="text-gray-500 text-sm">🗺️ Upload a KML file above to get started, then click anywhere on the map to add bus stops.</p>';
+    }
+    
+    showNotification('KML data cleared. Upload a new file to get started.', 'info');
+}
+
+/**
+ * Focus on specific KML route in the modal context
+ * @param {number} routeIndex - Index of the route to focus on
+ */
+function focusOnKMLRouteInModal(routeIndex) {
+    if (!window.modalKmlData || !window.modalKmlData[routeIndex]) {
+        showNotification('Route not found', 'error');
+        return;
+    }
+    
+    const route = window.modalKmlData[routeIndex];
+    
+    if (!route.stops || route.stops.length === 0) {
+        showNotification('Route has no stops to focus on', 'warning');
+        return;
+    }
+    
+    if (!routeCreationMap) {
+        showNotification('Map not initialized yet', 'warning');
+        return;
+    }
+    
+    // Focus the map on this route
+    if (googleMapsLoaded && routeCreationMap instanceof google.maps.Map) {
+        // Google Maps version
+        const bounds = new google.maps.LatLngBounds();
+        route.stops.forEach(stop => {
+            bounds.extend({ lat: stop.latitude, lng: stop.longitude });
+        });
+        routeCreationMap.fitBounds(bounds);
+    } else if (routeCreationMap.fitBounds) {
+        // Leaflet version
+        const bounds = L.latLngBounds(route.stops.map(stop => [stop.latitude, stop.longitude]));
+        routeCreationMap.fitBounds(bounds, { padding: [20, 20] });
+    }
+    
+    showNotification(`Focused on KML route: "${route.name}"`, 'success');
 }
 
 /**
@@ -2965,15 +3134,15 @@ function showCreateRouteModal() {
         return;
     }
     
-    // Reset route stops array
+    // Reset route stops array - start fresh
     routeStops = [];
-    console.log('✅ Route stops array reset');
+    console.log('✅ Route stops array reset - ready for KML or manual input');
     
     // Clear any existing stops list
     const stopsList = document.getElementById('routeStopsList');
     if (stopsList) {
-        stopsList.innerHTML = '<p class="text-gray-500 text-sm">🗺️ Click "Add Stop" button below or click anywhere on the map to add bus stops</p>';
-        console.log('✅ Stops list cleared');
+        stopsList.innerHTML = '<p class="text-gray-500 text-sm">🗺️ Upload a KML file above to get started, then click anywhere on the map to add bus stops.</p>';
+        console.log('✅ Stops list cleared and ready');
     } else {
         console.error('❌ Route stops list element not found!');
     }
@@ -2989,7 +3158,7 @@ function showCreateRouteModal() {
         }
     }
     
-    // Initialize map with longer delay to ensure modal is fully rendered
+    // Initialize map with delay to ensure modal is fully rendered
     setTimeout(() => {
         console.log('🗺️ Starting map initialization...');
         
@@ -3009,6 +3178,13 @@ function showCreateRouteModal() {
             displayKMLRoutesOnRouteCreationMap(routeKmlData);
             showNotification(`Showing ${routeKmlData.length} KML route(s) on the map for reference`, 'info');
         }
+        
+        // Check for modal KML data
+        if (window.modalKmlData && window.modalKmlData.length > 0) {
+            console.log('📍 Displaying modal KML data on route creation map...');
+            displayKMLRoutesOnRouteCreationMap(window.modalKmlData);
+        }
+        
     }, 1000); // Increased timeout for better modal rendering
 }
 
@@ -3160,6 +3336,13 @@ function initializeRouteCreationMap() {
             routeCreationMap.on('click', function(e) {
                 console.log('🎯 Map clicked at coordinates:', e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
                 
+                // Check if we're editing an existing stop
+                if (window.editingStopIndex !== null && window.editingStopIndex !== undefined) {
+                    updateExistingStop(window.editingStopIndex, e.latlng.lat, e.latlng.lng);
+                    cancelStopEdit();
+                    return;
+                }
+                
                 // Update debug overlay
                 const debugOverlay = document.getElementById('mapDebugInfo');
                 if (debugOverlay) {
@@ -3221,35 +3404,17 @@ function initializeRouteCreationMap() {
             // Show ready notification
             showNotification('Map is ready! Click anywhere to add bus stops.', 'success');
             
-            // Add instructional popup that's more prominent
-            const instructionPopup = L.popup({
-                closeButton: true,
-                autoClose: false,
-                closeOnClick: false,
-                className: 'route-instruction-popup'
-            })
-                .setLatLng([config.app.map.defaultCenter.lat, config.app.map.defaultCenter.lng])
-                .setContent(`
-                    <div style="text-align: center; padding: 10px;">
-                        <h4 style="margin: 0 0 8px 0; color: #10b981; font-size: 16px;">🗺️ Route Creation Map</h4>
-                        <p style="margin: 4px 0; font-size: 14px;"><strong>✅ Click anywhere to add bus stops!</strong></p>
-                        <p style="margin: 4px 0; font-size: 12px; color: #6b7280;">Select a city first to center the map on that area</p>
-                        <button onclick="routeCreationMap.closePopup()" style="margin-top: 8px; background: #10b981; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer;">Got it!</button>
-                    </div>
-                `)
-                .openOn(routeCreationMap);
-        }
-        
-        // If we have KML data loaded, display it on this map too
-        if (routeKmlData && routeKmlData.length > 0) {
-            console.log('📍 Displaying KML data on Leaflet route creation map...');
-            displayKMLRoutesOnRouteCreationMap(routeKmlData);
-        }
-        
-        // Check for modal KML data
-        if (window.modalKmlData && window.modalKmlData.length > 0) {
-            console.log('📍 Displaying modal KML data on Leaflet route creation map...');
-            displayKMLRoutesOnRouteCreationMap(window.modalKmlData);
+            // If we have KML data loaded, display it on this map too
+            if (routeKmlData && routeKmlData.length > 0) {
+                console.log('📍 Displaying KML data on Leaflet route creation map...');
+                displayKMLRoutesOnRouteCreationMap(routeKmlData);
+            }
+            
+            // Check for modal KML data
+            if (window.modalKmlData && window.modalKmlData.length > 0) {
+                console.log('📍 Displaying modal KML data on Leaflet route creation map...');
+                displayKMLRoutesOnRouteCreationMap(window.modalKmlData);
+            }
         }
         
     } catch (error) {
@@ -3272,6 +3437,8 @@ function initializeRouteCreationMap() {
 
 function addRouteStop() {
     console.log('Adding manual route stop');
+    
+    const nextStopNumber = routeStops.length + 1;
     const stopIndex = routeStops.length;
     
     // Add empty stop to array
@@ -3282,6 +3449,9 @@ function addRouteStop() {
     });
     
     addRouteStopToUI(stopIndex);
+    
+    console.log(`Created empty Stop ${nextStopNumber} slot at index ${stopIndex}`);
+    showNotification(`Stop ${nextStopNumber} slot created. Click on the map or enter coordinates to complete it.`, 'info');
 }
 
 function addRouteStopToUI(stopIndex) {
@@ -3296,42 +3466,184 @@ function addRouteStopToUI(stopIndex) {
         stopsList.innerHTML = '';
     }
     
+    const stop = routeStops[stopIndex] || {};
+    const stopNumber = stopIndex + 1; // Sequential numbering: 1, 2, 3, etc.
+    
     const stopDiv = document.createElement('div');
     stopDiv.className = 'border border-gray-200 p-3 rounded-lg bg-white';
+    stopDiv.id = `stopDiv${stopIndex}`;
     stopDiv.innerHTML = `
         <div class="flex items-center justify-between mb-2">
-            <h4 class="font-semibold text-gray-800 text-sm">Stop ${stopIndex + 1}</h4>
-            <button type="button" onclick="removeRouteStop(${stopIndex})" class="text-red-500 hover:text-red-700 text-sm">
-                <i class="fas fa-trash"></i>
-            </button>
+            <h4 class="font-semibold text-gray-800 text-sm flex items-center">
+                <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-xs font-bold">
+                    ${stopNumber}
+                </div>
+                ${stop.name || `Stop ${stopNumber}`}
+                ${stop.name ? `<span class="ml-2 text-green-600 text-xs">(✓)</span>` : '<span class="ml-2 text-orange-500 text-xs">(Unnamed)</span>'}
+            </h4>
+            <div class="flex space-x-2">
+                ${stop.latitude && stop.longitude ? `
+                    <button type="button" onclick="editStopOnMap(${stopIndex})" 
+                            class="text-blue-500 hover:text-blue-700 text-sm" title="Edit location on map">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                ` : ''}
+                <button type="button" onclick="removeRouteStop(${stopIndex})" 
+                        class="text-red-500 hover:text-red-700 text-sm" title="Remove stop">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 gap-2">
             <div>
                 <label class="block text-xs text-gray-600 mb-1">Stop Name</label>
-                <input type="text" class="w-full p-2 border rounded text-sm" placeholder="Enter stop name" 
+                <input type="text" id="stopName${stopIndex}" 
+                       class="w-full p-2 border rounded text-sm" 
+                       placeholder="Enter stop name" 
+                       value="${stop.name || ''}"
                        onchange="updateStopName(${stopIndex}, this.value)">
             </div>
             <div>
-                <label class="block text-xs text-gray-600 mb-1">Coordinates</label>
-                <input type="text" class="w-full p-2 border rounded bg-gray-50 text-sm" 
-                       placeholder="Click on map to set" readonly id="stopCoords${stopIndex}">
+                <label class="block text-xs text-gray-600 mb-1">Bus Stop Number</label>
+                <input type="text" class="w-full p-2 border rounded bg-blue-50 text-sm font-mono text-center" 
+                       value="Stop ${stopNumber}" readonly 
+                       style="background-color: #dbeafe; font-weight: bold; color: #1d4ed8;">
             </div>
         </div>
     `;
     
     stopsList.appendChild(stopDiv);
-    console.log('Stop UI added for index:', stopIndex);
+    console.log('Stop UI added for index:', stopIndex, 'as Stop', stopNumber);
 }
 
 function removeRouteStop(index) {
-    routeStops.splice(index, 1);
-    updateRouteStopsDisplay();
-    updateRouteVisualization();
+    console.log('Removing route stop at index:', index);
+    
+    if (index >= 0 && index < routeStops.length) {
+        const stopNumber = index + 1;
+        const stopName = routeStops[index].name || `Stop ${stopNumber}`;
+        
+        // Remove from array
+        routeStops.splice(index, 1);
+        
+        // Update UI - rebuild all stops to maintain sequential numbering
+        updateRouteStopsDisplay();
+        updateRouteVisualization();
+        
+        showNotification(`Stop ${stopNumber}: "${stopName}" removed successfully`, 'info');
+        
+        console.log(`Stop ${stopNumber} removed. Remaining stops:`, routeStops.length);
+        console.log('Updated stop sequence:', routeStops.map((s, i) => ({ stopNumber: i + 1, name: s.name })));
+    }
 }
 
 function updateStopName(index, name) {
     if (routeStops[index]) {
         routeStops[index].name = name;
+        console.log(`Updated stop ${index + 1} name to:`, name);
+        
+        // Update the visual indicator in the UI
+        const stopDiv = document.getElementById(`stopDiv${index}`);
+        if (stopDiv) {
+            const statusSpan = stopDiv.querySelector('h4 span');
+            if (statusSpan) {
+                if (name.trim()) {
+                    statusSpan.textContent = '(✓ Named)';
+                    statusSpan.className = 'ml-2 text-green-600 text-xs';
+                } else {
+                    statusSpan.textContent = '(Click map to set)';
+                    statusSpan.className = 'ml-2 text-orange-500 text-xs';
+                }
+            }
+        }
+        
+        // Update map visualization if needed
+        updateRouteVisualization();
+    }
+}
+
+// Function to edit stop location on map
+function editStopOnMap(stopIndex) {
+    const stop = routeStops[stopIndex];
+    if (!stop) {
+        showNotification('Stop not found', 'error');
+        return;
+    }
+    
+    showNotification(`Click on the map to update the location of "${stop.name || `Stop ${stopIndex + 1}`}"`, 'info');
+    
+    // Set temporary edit mode
+    window.editingStopIndex = stopIndex;
+    
+    // Visual feedback on map
+    if (routeCreationMap) {
+        routeCreationMap.getContainer().style.cursor = 'crosshair';
+        routeCreationMap.getContainer().style.border = '3px solid #f59e0b';
+    }
+    
+    // Show cancel button overlay
+    showEditStopOverlay(stopIndex);
+}
+
+// Show overlay for editing stop
+function showEditStopOverlay(stopIndex) {
+    // Remove existing overlay
+    const existingOverlay = document.getElementById('editStopOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'editStopOverlay';
+    overlay.className = 'fixed top-24 right-4 bg-yellow-100 border border-yellow-300 rounded-lg p-3 z-50 shadow-lg';
+    overlay.innerHTML = `
+        <div class="text-sm text-yellow-800">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-edit mr-2"></i>
+                <strong>Editing Stop ${stopIndex + 1}</strong>
+            </div>
+            <p class="mb-3">Click on the map to set new location</p>
+            <button onclick="cancelStopEdit()" class="bg-yellow-500 text-white px-3 py-1 rounded text-xs hover:bg-yellow-600">
+                Cancel Edit
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+}
+
+// Cancel stop editing
+function cancelStopEdit() {
+    window.editingStopIndex = null;
+    
+    // Reset map styling
+    if (routeCreationMap) {
+        routeCreationMap.getContainer().style.cursor = '';
+        routeCreationMap.getContainer().style.border = '3px solid #3b82f6';
+    }
+    
+    // Remove overlay
+    const overlay = document.getElementById('editStopOverlay');
+    if (overlay) overlay.remove();
+    
+    showNotification('Stop editing cancelled', 'info');
+}
+
+// Update existing stop with new coordinates
+function updateExistingStop(stopIndex, newLat, newLng) {
+    if (stopIndex >= 0 && stopIndex < routeStops.length) {
+        const oldStop = { ...routeStops[stopIndex] };
+        
+        // Update coordinates
+        routeStops[stopIndex].latitude = newLat;
+        routeStops[stopIndex].longitude = newLng;
+        
+        // Update UI
+        updateStopUIAtIndex(stopIndex);
+        updateRouteVisualization();
+        
+        const stopName = routeStops[stopIndex].name || `Stop ${stopIndex + 1}`;
+        showNotification(`"${stopName}" location updated successfully!`, 'success');
+        
+        console.log(`Updated stop ${stopIndex} from [${oldStop.latitude?.toFixed(6)}, ${oldStop.longitude?.toFixed(6)}] to [${newLat.toFixed(6)}, ${newLng.toFixed(6)}]`);
     }
 }
 
@@ -3341,9 +3653,110 @@ function addStopToRoute(lat, lng) {
     // Validate coordinates
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
         console.error('❌ Invalid coordinates provided:', lat, lng);
-        alert('Invalid coordinates. Please try clicking on the map again.');
+        showNotification('Invalid coordinates. Please try clicking on the map again.', 'error');
         return;
     }
+    
+    // Show popup for custom stop name
+    showStopNamePopup(lat, lng);
+}
+
+// Show popup/modal for entering custom stop name
+function showStopNamePopup(lat, lng) {
+    const stopNumber = routeStops.length + 1;
+    
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001]';
+    modalOverlay.id = 'stopNameModal';
+    
+    modalOverlay.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">
+                        <i class="fas fa-map-pin mr-2 text-blue-500"></i> Add Bus Stop ${stopNumber}
+                    </h3>
+                    <button onclick="closeStopNamePopup()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="bg-blue-50 p-3 rounded-lg">
+                        <p class="text-sm text-blue-700">
+                            <strong>Location:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}
+                        </p>
+                        <p class="text-sm text-blue-700 mt-1">
+                            <strong>Will be assigned:</strong> <span class="font-bold">Stop ${stopNumber}</span>
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Bus Stop Name <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="stopNameInput" 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                               placeholder="e.g., Main Bus Station, City Center, School Junction"
+                               maxlength="50">
+                        <p class="text-xs text-gray-500 mt-1">Enter a descriptive name for this bus stop</p>
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button onclick="closeStopNamePopup()" 
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            Cancel
+                        </button>
+                        <button onclick="confirmStopAddition(${lat}, ${lng})" 
+                                class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+                            <i class="fas fa-plus mr-1"></i> Add Stop ${stopNumber}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modalOverlay);
+    
+    // Focus on input
+    setTimeout(() => {
+        const input = document.getElementById('stopNameInput');
+        if (input) {
+            input.focus();
+            
+            // Handle Enter key
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    confirmStopAddition(lat, lng);
+                }
+            });
+        }
+    }, 100);
+}
+
+// Close stop name popup
+function closeStopNamePopup() {
+    const modal = document.getElementById('stopNameModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Confirm and add the stop with custom name
+function confirmStopAddition(lat, lng) {
+    const nameInput = document.getElementById('stopNameInput');
+    const stopName = nameInput ? nameInput.value.trim() : '';
+    
+    if (!stopName) {
+        showNotification('Please enter a name for the bus stop', 'warning');
+        nameInput?.focus();
+        return;
+    }
+    
+    // Calculate the next sequential stop number
+    const nextStopNumber = routeStops.length + 1;
     
     // Find the first empty stop or add new one
     let targetIndex = routeStops.findIndex(stop => !stop.latitude);
@@ -3352,31 +3765,28 @@ function addStopToRoute(lat, lng) {
         // No empty stops, create a new one
         const stopIndex = routeStops.length;
         routeStops.push({
-            name: '',
+            name: stopName,
             latitude: lat,
             longitude: lng
         });
         targetIndex = stopIndex;
-        console.log('➕ Created new stop at index:', targetIndex);
+        console.log(`➕ Created new Stop ${nextStopNumber} at index:`, targetIndex, 'with name:', stopName);
         
         // Add new stop to the UI
         addRouteStopToUI(targetIndex);
     } else {
         // Fill empty stop
+        routeStops[targetIndex].name = stopName;
         routeStops[targetIndex].latitude = lat;
         routeStops[targetIndex].longitude = lng;
-        console.log('🔄 Updated existing stop at index:', targetIndex);
+        console.log(`🔄 Updated existing stop at index:`, targetIndex, 'with name:', stopName);
+        
+        // Update the UI for this stop
+        updateStopUIAtIndex(targetIndex);
     }
     
-    // Update coordinate display
-    const coordsInput = document.getElementById(`stopCoords${targetIndex}`);
-    if (coordsInput) {
-        coordsInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-        coordsInput.style.backgroundColor = '#dcfce7'; // Light green to show it's filled
-        console.log('Updated coordinates display for stop', targetIndex + 1);
-    } else {
-        console.error('Coordinates input not found for stop:', targetIndex);
-    }
+    // Close the popup
+    closeStopNamePopup();
     
     // Update route visualization
     updateRouteVisualization();
@@ -3392,8 +3802,11 @@ function addStopToRoute(lat, lng) {
         }
     }
     
-    console.log('✅ Stop added successfully. Total stops:', routeStops.length);
-    console.log('📋 Current route stops:', routeStops);
+    console.log(`✅ Stop ${nextStopNumber} added successfully. Total stops:`, routeStops.length);
+    console.log('📋 Current route stops:', routeStops.map((s, i) => ({ stopNumber: i + 1, name: s.name })));
+    
+    // Show success notification with sequential number
+    showNotification(`Stop ${nextStopNumber}: "${stopName}" added successfully!`, 'success');
     
     // Provide audio feedback (if supported)
     try {
@@ -3401,6 +3814,41 @@ function addStopToRoute(lat, lng) {
         audio.volume = 0.1;
         audio.play().catch(() => {}); // Ignore if audio fails
     } catch (e) {}
+}
+
+// Update UI for a specific stop index
+function updateStopUIAtIndex(index) {
+    const stop = routeStops[index];
+    if (!stop) return;
+    
+    const stopNumber = index + 1;
+    
+    // Update name input
+    const nameInput = document.querySelector(`#stopName${index}`);
+    if (nameInput) {
+        nameInput.value = stop.name || '';
+    }
+    
+    // Update status indicator in the header
+    const stopDiv = document.getElementById(`stopDiv${index}`);
+    if (stopDiv) {
+        const statusSpan = stopDiv.querySelector('h4 span');
+        const headerTitle = stopDiv.querySelector('h4');
+        
+        if (statusSpan && headerTitle) {
+            // Update the header text to show current name
+            const numberCircle = headerTitle.querySelector('div');
+            const circleHtml = numberCircle ? numberCircle.outerHTML : `<div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center mr-3 text-xs font-bold">${stopNumber}</div>`;
+            
+            headerTitle.innerHTML = `
+                ${circleHtml}
+                ${stop.name || `Stop ${stopNumber}`}
+                ${stop.name ? '<span class="ml-2 text-green-600 text-xs">(✓)</span>' : '<span class="ml-2 text-orange-500 text-xs">(Unnamed)</span>'}
+            `;
+        }
+    }
+    
+    console.log(`Updated UI for Stop ${stopNumber}: "${stop.name || 'Unnamed'}"`); 
 }
 
 function updateRouteStopsDisplay() {
@@ -3464,16 +3912,49 @@ function updateRouteVisualization() {
     console.log('Valid stops for visualization:', validStops.length);
     
     validStops.forEach((stop, index) => {
+        const stopNumber = index + 1; // Sequential numbering
+        
         // Create custom marker icon
         const markerIcon = L.divIcon({
             className: 'route-stop-marker',
-            html: `<div style="background: #ef4444; border: 2px solid white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${index + 1}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            html: `<div style="background: #ef4444; border: 2px solid white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${stopNumber}</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
         });
         
         const marker = L.marker([stop.latitude, stop.longitude], { icon: markerIcon }).addTo(map);
-        marker.bindPopup(`<b>Stop ${index + 1}</b><br>${stop.name || 'Unnamed Stop'}<br>Lat: ${stop.latitude.toFixed(6)}<br>Lng: ${stop.longitude.toFixed(6)}`);
+        
+        // Create popup with simplified display
+        const popupContent = `
+            <div style="min-width: 150px;">
+                <h4 style="margin: 0 0 8px 0; color: #ef4444; display: flex; align-items: center;">
+                    <div style="width: 20px; height: 20px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 11px; font-weight: bold;">
+                        ${stopNumber}
+                    </div>
+                    ${stop.name || `Stop ${stopNumber}`}
+                </h4>
+                <div style="margin-bottom: 8px; padding: 6px; background: #f8fafc; border-radius: 4px;">
+                    <div style="font-size: 11px; color: #6b7280; margin-bottom: 2px;"><strong>Bus Stop Number:</strong></div>
+                    <div style="font-size: 13px; font-weight: bold; color: #1d4ed8;">Stop ${stopNumber}</div>
+                </div>
+                <div style="display: flex; gap: 4px; margin-top: 8px;">
+                    <button onclick="editStopName(${index})" 
+                            style="flex: 1; background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 10px;">
+                        Edit
+                    </button>
+                    <button onclick="editStopOnMap(${index})" 
+                            style="flex: 1; background: #f59e0b; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 10px;">
+                        Move
+                    </button>
+                    <button onclick="removeRouteStop(${index})" 
+                            style="flex: 1; background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 10px;">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
     });
     
     // Draw route line if we have multiple stops

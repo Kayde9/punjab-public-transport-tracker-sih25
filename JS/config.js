@@ -275,8 +275,8 @@ const appConfig = {
         maxZoom: 18,
         minZoom: 6,
         
-        // Primary provider: Google Earth/Maps
-        provider: 'google', // 'google', 'leaflet', 'mappls'
+        // Primary provider: Leaflet (OpenStreetMap) - Reliable fallback
+        provider: 'leaflet', // 'google', 'leaflet', 'mappls'
         
         // Google Earth/Maps Configuration
         google: {

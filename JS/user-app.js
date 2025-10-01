@@ -137,14 +137,20 @@ function initializeMap() {
         console.log('Initializing map with center:', PTTConfig.app.map.defaultCenter);
         
         // Check provider preference
-        const preferredProvider = PTTConfig.app.map.provider || 'google';
+        const preferredProvider = PTTConfig.app.map.provider || 'leaflet';
         
-        // Try Google Maps first if preferred and available
+        // Use Leaflet as primary provider for reliability
+        console.log('Using Leaflet as primary provider for reliability');
+        initializeLeafletMap();
+        
+        // Keep Google Maps as secondary option if needed
+        /*
         if (preferredProvider === 'google' && googleMapsLoaded) {
             console.log('Using Google Maps as primary provider');
             initializeGoogleMap();
             return;
         }
+        */
         
         // Check if MapmyIndia SDK is loaded AND API key is configured
         const hasMapplsApiKey = PTTConfig.app.map.mappls && 
@@ -346,6 +352,11 @@ function initializeLeafletMap() {
         });
         
         console.log('Leaflet map initialized successfully');
+        
+        // Show notification about using OpenStreetMap for reliability
+        if (typeof CommonUtils !== 'undefined') {
+            CommonUtils.showNotification('Map loaded successfully using OpenStreetMap for better reliability!', 'success', 5000);
+        }
         
     } catch (error) {
         console.error('Error initializing Leaflet map:', error);
@@ -570,7 +581,7 @@ function trackBuses() {
 }
 
 function drawRoute(cityId, routeId) {
-    console.log('Drawing route for city:', cityId, 'route:', routeId); // Debug log
+    console.log('Drawing route for city:', cityId, 'route:', routeId);
     
     const routes = PTTConfig.data.routes[cityId];
     if (!routes || !Array.isArray(routes)) {
@@ -585,15 +596,60 @@ function drawRoute(cityId, routeId) {
     }
 
     console.log('Found route:', route);
-    const routePath = route.stops.map(stop => [stop.lat, stop.lng]);
     
+    // Clear existing route line
     if (routeLine) {
-        map.removeLayer(routeLine);
+        if (map.removeLayer) {
+            // Leaflet map
+            map.removeLayer(routeLine);
+        } else if (routeLine.setMap) {
+            // Google Maps
+            routeLine.setMap(null);
+        }
     }
-
-    routeLine = L.polyline(routePath, { color: route.color || '#ea580c' }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
-    console.log('Route drawn successfully');
+    
+    // Detect map provider and draw route accordingly
+    if (map && map.setCenter && typeof google !== 'undefined' && map.addListener) {
+        // Google Maps implementation
+        console.log('Drawing route on Google Maps');
+        const routePath = route.stops.map(stop => ({ lat: stop.lat, lng: stop.lng }));
+        
+        routeLine = new google.maps.Polyline({
+            path: routePath,
+            geodesic: true,
+            strokeColor: route.color || '#ea580c',
+            strokeOpacity: 0.8,
+            strokeWeight: 4
+        });
+        
+        routeLine.setMap(map);
+        
+        // Fit bounds for Google Maps
+        const bounds = new google.maps.LatLngBounds();
+        route.stops.forEach(stop => {
+            bounds.extend({ lat: stop.lat, lng: stop.lng });
+        });
+        map.fitBounds(bounds);
+        
+    } else if (map && map.setView && typeof L !== 'undefined') {
+        // Leaflet implementation
+        console.log('Drawing route on Leaflet map');
+        const routePath = route.stops.map(stop => [stop.lat, stop.lng]);
+        
+        routeLine = L.polyline(routePath, { 
+            color: route.color || '#ea580c',
+            weight: 4,
+            opacity: 0.8
+        }).addTo(map);
+        
+        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+        
+    } else {
+        console.error('Unable to determine map provider or map not initialized');
+        return;
+    }
+    
+    console.log('Route drawn successfully on', map.constructor.name || 'unknown map provider');
 }
 
 // Demo data loading function for testing
@@ -704,8 +760,17 @@ function updateBusMarkers(buses) {
     // Remove stale markers
     Object.keys(busMarkers).forEach(deviceId => {
         if (!buses || !buses[deviceId] || (Date.now() - buses[deviceId].timestamp > PTTConfig.app.tracking.staleDataThreshold)) {
-            map.removeLayer(busMarkers[deviceId]);
-            delete busMarkers[deviceId];
+            // Detect map provider and remove marker appropriately
+            if (busMarkers[deviceId]) {
+                if (map.removeLayer && typeof L !== 'undefined') {
+                    // Leaflet map
+                    map.removeLayer(busMarkers[deviceId]);
+                } else if (busMarkers[deviceId].setMap) {
+                    // Google Maps
+                    busMarkers[deviceId].setMap(null);
+                }
+                delete busMarkers[deviceId];
+            }
         }
     });
 
@@ -714,33 +779,82 @@ function updateBusMarkers(buses) {
     Object.keys(buses).forEach(deviceId => {
         const bus = buses[deviceId];
         if (Date.now() - bus.timestamp < PTTConfig.app.tracking.staleDataThreshold) {
-            const busLocation = [bus.latitude, bus.longitude];
             
-            if (busMarkers[deviceId]) {
-                // Update existing marker
-                busMarkers[deviceId].setLatLng(busLocation);
+            // Detect map provider and create/update markers accordingly
+            if (map && map.setCenter && typeof google !== 'undefined' && map.addListener) {
+                // Google Maps implementation
+                const busLocation = { lat: bus.latitude, lng: bus.longitude };
+                
+                if (busMarkers[deviceId]) {
+                    // Update existing marker
+                    busMarkers[deviceId].setPosition(busLocation);
+                } else {
+                    // Create new Google Maps marker
+                    busMarkers[deviceId] = new google.maps.Marker({
+                        position: busLocation,
+                        map: map,
+                        title: `Bus: ${bus.busNumber}`,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 12,
+                            fillColor: '#ea580c',
+                            fillOpacity: 0.8,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2
+                        }
+                    });
+                    
+                    // Add info window
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div>
+                                <b>Bus:</b> ${bus.busNumber}<br>
+                                <b>Driver:</b> ${bus.driverName || 'Unknown'}<br>
+                                <b>Speed:</b> ${bus.speed || 0} km/h<br>
+                                <b>Device:</b> ${deviceId.substring(0, 12)}...<br>
+                                <b>Last Update:</b> ${typeof CommonUtils !== 'undefined' ? CommonUtils.getTimeAgo(bus.timestamp) : 'Recently'}
+                            </div>
+                        `
+                    });
+                    
+                    busMarkers[deviceId].addListener('click', () => {
+                        infoWindow.open(map, busMarkers[deviceId]);
+                    });
+                }
+                
+            } else if (map && map.setView && typeof L !== 'undefined') {
+                // Leaflet implementation
+                const busLocation = [bus.latitude, bus.longitude];
+                
+                if (busMarkers[deviceId]) {
+                    // Update existing marker
+                    busMarkers[deviceId].setLatLng(busLocation);
+                } else {
+                    // Create new Leaflet marker
+                    const busIcon = L.divIcon({
+                        className: 'bus-marker',
+                        html: `<i class="fas fa-bus"></i>`,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    });
+                    busMarkers[deviceId] = L.marker(busLocation, { icon: busIcon }).addTo(map);
+                }
+                
+                // Update popup with device info
+                const popupContent = `
+                    <div>
+                        <b>Bus:</b> ${bus.busNumber}<br>
+                        <b>Driver:</b> ${bus.driverName || 'Unknown'}<br>
+                        <b>Speed:</b> ${bus.speed || 0} km/h<br>
+                        <b>Device:</b> ${deviceId.substring(0, 12)}...<br>
+                        <b>Last Update:</b> ${typeof CommonUtils !== 'undefined' ? CommonUtils.getTimeAgo(bus.timestamp) : 'Recently'}
+                    </div>
+                `;
+                busMarkers[deviceId].bindPopup(popupContent);
+                
             } else {
-                // Create new marker
-                const busIcon = L.divIcon({
-                    className: 'bus-marker',
-                    html: `<i class="fas fa-bus"></i>`,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                });
-                busMarkers[deviceId] = L.marker(busLocation, { icon: busIcon }).addTo(map);
+                console.warn('Unable to determine map provider for bus marker creation');
             }
-            
-            // Update popup with device info
-            const popupContent = `
-                <div>
-                    <b>Bus:</b> ${bus.busNumber}<br>
-                    <b>Driver:</b> ${bus.driverName || 'Unknown'}<br>
-                    <b>Speed:</b> ${bus.speed || 0} km/h<br>
-                    <b>Device:</b> ${deviceId.substring(0, 12)}...<br>
-                    <b>Last Update:</b> ${typeof CommonUtils !== 'undefined' ? CommonUtils.getTimeAgo(bus.timestamp) : 'Recently'}
-                </div>
-            `;
-            busMarkers[deviceId].bindPopup(popupContent);
         }
     });
 }
@@ -780,8 +894,28 @@ function getUserLocation() {
 
 // Utility Functions
 function clearMap() {
-    if (routeLine) map.removeLayer(routeLine);
-    Object.values(busMarkers).forEach(marker => map.removeLayer(marker));
+    // Clear route line
+    if (routeLine) {
+        if (map.removeLayer && typeof L !== 'undefined') {
+            // Leaflet map
+            map.removeLayer(routeLine);
+        } else if (routeLine.setMap) {
+            // Google Maps
+            routeLine.setMap(null);
+        }
+        routeLine = null;
+    }
+    
+    // Clear bus markers
+    Object.values(busMarkers).forEach(marker => {
+        if (map.removeLayer && typeof L !== 'undefined') {
+            // Leaflet map
+            map.removeLayer(marker);
+        } else if (marker.setMap) {
+            // Google Maps
+            marker.setMap(null);
+        }
+    });
     busMarkers = {};
 }
 
@@ -1052,56 +1186,54 @@ function planJourney() {
     resultsDiv.classList.remove('hidden');
     resultsDiv.innerHTML = `
         <div class="bg-white p-4 rounded-lg border">
-            <h4 class="font-semibold mb-2">🚀 Journey Plan</h4>
-            <div class="space-y-2 text-sm">
-                <div>Route: CH-001 Express</div>
-                <div>Time: 25 minutes</div>
-                <div>Fare: ₹15</div>
-                <div>Next bus: In 8 minutes</div>
+            <h4 class="font-semibold mb-3">Journey Plan</h4>
+            <div class="space-y-3 text-sm">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <div class="font-medium text-blue-800 mb-2">Route Information</div>
+                    <div class="space-y-1">
+                        <div><span class="font-medium">Route:</span> CH-001 Express</div>
+                        <div><span class="font-medium">Total Travel Time:</span> 25 minutes</div>
+                        <div><span class="font-medium">Fare:</span> ₹15</div>
+                        <div><span class="font-medium">Next Bus:</span> In 8 minutes</div>
+                    </div>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <div class="font-medium text-green-800 mb-2">Bus Stops on Route</div>
+                    <div class="space-y-1 text-xs">
+                        <div class="flex justify-between">
+                            <span>Sector 17 Terminal</span>
+                            <span class="text-gray-500">0 min</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Sector 22 Market</span>
+                            <span class="text-gray-500">8 min</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Sector 35 Complex</span>
+                            <span class="text-gray-500">18 min</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Railway Station</span>
+                            <span class="text-gray-500">25 min</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-yellow-50 p-3 rounded-lg">
+                    <div class="font-medium text-yellow-800 mb-2">Time Schedule</div>
+                    <div class="space-y-1">
+                        <div><span class="font-medium">Departure:</span> Every 10-15 minutes</div>
+                        <div><span class="font-medium">Peak Hours:</span> 7:00-10:00 AM, 5:00-8:00 PM</div>
+                        <div><span class="font-medium">Service Hours:</span> 6:00 AM - 11:00 PM</div>
+                    </div>
+                </div>
             </div>
-            <button onclick="startTracking()" class="w-full bg-green-600 text-white p-2 rounded mt-3">Start Tracking</button>
+            <button onclick="startTracking()" class="w-full bg-green-600 text-white p-2 rounded mt-4 hover:bg-green-700 transition">Start Live Tracking</button>
         </div>
     `;
 }
 
 function startTracking() {
     CommonUtils.showNotification('Live tracking started!', 'success');
-}
-
-// Feedback System
-function initializeFeedback() {
-    const stars = document.querySelectorAll('.star');
-    window.selectedRating = 0;
-    
-    stars.forEach(star => {
-        star.addEventListener('click', () => {
-            window.selectedRating = parseInt(star.getAttribute('data-rating'));
-            updateStars(window.selectedRating);
-        });
-    });
-}
-
-function updateStars(rating) {
-    const stars = document.querySelectorAll('.star');
-    stars.forEach((star, index) => {
-        star.classList.toggle('text-yellow-500', index < rating);
-        star.classList.toggle('text-gray-300', index >= rating);
-    });
-}
-
-function submitFeedback() {
-    const busNumber = document.getElementById('feedbackBusNumber').value;
-    const rating = window.selectedRating;
-    
-    if (!busNumber || !rating) {
-        CommonUtils.showNotification('Please fill all fields', 'warning');
-        return;
-    }
-    
-    CommonUtils.showNotification('Thank you for your feedback!', 'success');
-    document.getElementById('feedbackBusNumber').value = '';
-    window.selectedRating = 0;
-    updateStars(0);
 }
 
 // Live Arrivals
@@ -1114,7 +1246,7 @@ function updateArrivals() {
                     <div>Bus PB-07-1234</div>
                     <div class="font-bold text-green-600">3 min</div>
                 </div>
-                <div class="text-xs text-gray-500">Route CH-001 • 45% full • ⭐ 4.7</div>
+                <div class="text-xs text-gray-500">Route CH-001 • 45% full • 4.7/5</div>
             </div>
         `;
         document.getElementById('arrivalPredictions').classList.remove('hidden');
@@ -1124,7 +1256,6 @@ function updateArrivals() {
 // Initialize features
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
-        initializeFeedback();
         updateArrivals();
         populateStops();
     }, 1000);

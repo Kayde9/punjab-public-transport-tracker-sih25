@@ -6,53 +6,219 @@
     <title>Punjab Public Transport Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Mukti:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <style>
+        .punjabi-text { font-family: 'Mukti', sans-serif; }
+        .english-text { font-family: 'Inter', sans-serif; }
+        .hero-gradient { background: linear-gradient(135deg, #f8f4e6 0%, #faf7f0 25%, #fff9e6 50%, #f0f8ff 75%, #e8f5e8 100%); }
+        .floating-animation { animation: float 6s ease-in-out infinite; }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0px); }
+        }
+        .glow-effect { box-shadow: 0 0 20px rgba(164, 80, 20, 0.2); }
+        .text-glow { text-shadow: 0 0 10px rgba(139, 69, 19, 0.3); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
+        .pulse-border { animation: pulse-border 2s infinite; border: 2px solid; }
+        @keyframes pulse-border {
+            0% { border-color: #8b4513; box-shadow: 0 0 0 0 rgba(139, 69, 19, 0.3); }
+            70% { box-shadow: 0 0 0 15px rgba(139, 69, 19, 0); }
+            100% { border-color: #8b4513; box-shadow: 0 0 0 0 rgba(139, 69, 19, 0); }
+        }
+        .monument-bg { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="monuments" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="2" fill="%23d4b896" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23monuments)"/></svg>'); }
+        .punjabi-silhouette { filter: drop-shadow(2px 2px 4px rgba(139, 69, 19, 0.2)); }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-orange-50 to-white">
+<body class="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 overflow-x-hidden monument-bg">
+
     <!-- Navigation -->
-    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+    <nav class="bg-white/98 backdrop-blur-sm shadow-md fixed w-full top-0 z-40 border-b border-amber-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
+            <div class="flex justify-between h-20">
                 <div class="flex items-center">
-                    <i class="fas fa-bus text-orange-600 text-2xl mr-3"></i>
-                    <span class="text-xl font-bold text-gray-800">Punjab Transport Tracker</span>
+                    <div class="pulse-border rounded-full p-2 mr-4 bg-amber-50">
+                        <i class="fas fa-bus text-amber-700 text-3xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-2xl font-bold text-amber-800 english-text">Punjab Transport Tracker</span>
+                        <div class="text-sm text-amber-600 punjabi-text">ਪੰਜਾਬ ਟਰਾਂਸਪੋਰਟ ਟਰੈਕਰ</div>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="user-app.html" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition">Track Bus</a>
-                    <a href="driver-app.html" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">Driver Login</a>
-                    <a href="admin-dashboard.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Admin</a>
+                <div class="flex items-center space-x-3">
+                    <a href="user-app.html" class="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-6 py-3 rounded-full hover:shadow-md transform hover:scale-105 transition-all duration-300 font-semibold">
+                        <i class="fas fa-map-marked-alt mr-2"></i>
+                        <span>Track Bus</span>
+                    </a>
+                    <a href="driver-app.html" class="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-3 rounded-full hover:shadow-md transform hover:scale-105 transition-all duration-300 font-semibold">
+                        <i class="fas fa-user-tie mr-2"></i>
+                        <span>Driver</span>
+                    </a>
+                    <a href="admin-dashboard.html" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-full hover:shadow-md transform hover:scale-105 transition-all duration-300 font-semibold">
+                        <i class="fas fa-cog mr-2"></i>
+                        <span>Admin</span>
+                    </a>
                 </div>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="pt-20 pb-12 px-4">
-        <div class="max-w-7xl mx-auto mt-10">
-            <div class="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                    <h1 class="text-5xl font-bold text-gray-800 mb-6">
-                        Real-Time Bus Tracking for 
-                        <span class="text-orange-600">Punjab</span>
+    <section class="pt-20 pb-16 px-4 hero-gradient min-h-screen flex items-center relative overflow-hidden">
+        <!-- Animated Background Elements -->
+        <div class="absolute inset-0">
+            <div class="absolute top-20 left-10 w-32 h-32 bg-amber-200/20 rounded-full blur-xl floating-animation"></div>
+            <div class="absolute top-40 right-20 w-24 h-24 bg-orange-200/20 rounded-full blur-lg floating-animation" style="animation-delay: -2s;"></div>
+            <div class="absolute bottom-20 left-20 w-40 h-40 bg-yellow-200/15 rounded-full blur-2xl floating-animation" style="animation-delay: -4s;"></div>
+            
+            <!-- Punjab Monuments Silhouettes -->
+            <div class="absolute top-1/4 right-10 opacity-10">
+                <!-- Golden Temple Silhouette -->
+                <svg width="120" height="100" viewBox="0 0 120 100" class="punjabi-silhouette">
+                    <path d="M60 10 L50 20 L30 20 L30 80 L90 80 L90 20 L70 20 Z" fill="#d4b896"/>
+                    <circle cx="60" cy="25" r="8" fill="#d4b896"/>
+                    <rect x="35" y="25" width="50" height="40" fill="#d4b896"/>
+                    <polygon points="35,25 60,15 85,25" fill="#d4b896"/>
+                </svg>
+            </div>
+            
+            <div class="absolute bottom-1/4 left-10 opacity-10">
+                <!-- Qila Mubarak Silhouette -->
+                <svg width="100" height="80" viewBox="0 0 100 80" class="punjabi-silhouette">
+                    <rect x="10" y="30" width="80" height="50" fill="#d4b896"/>
+                    <polygon points="10,30 20,20 30,30" fill="#d4b896"/>
+                    <polygon points="70,30 80,20 90,30" fill="#d4b896"/>
+                    <rect x="45" y="40" width="10" height="20" fill="#c19a6b"/>
+                </svg>
+            </div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto mt-10 relative z-10">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="text-center md:text-left">
+                    <!-- Main Title -->
+                    <h1 class="text-6xl md:text-7xl font-bold text-amber-800 mb-6 english-text text-glow leading-tight">
+                        Real-Time Bus Tracking
+                        <span class="block text-orange-700">for Punjab</span>
                     </h1>
-                    <p class="text-xl text-gray-600 mb-8">
-                        Track your city buses in real-time. Never miss your bus again with live GPS tracking across Punjab's cities.
+                    
+                    <!-- Punjabi Subtitle -->
+                    <p class="text-2xl md:text-3xl text-amber-700 mb-8 punjabi-text font-light">
+                        ਰੀਅਲ-ਟਾਈਮ ਬੱਸ ਟਰੈਕਿੰਗ ਪੰਜਾਬ ਲਈ
                     </p>
-                    <div class="space-x-4">
-                        <a href="user-app.html" class="bg-orange-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-orange-700 transition inline-block">
-                            <i class="fas fa-map-marked-alt mr-2"></i> Start Tracking
+                    
+                    <!-- Description -->
+                    <p class="text-xl text-amber-600 mb-10 leading-relaxed english-text">
+                        Track your city buses in real-time with live GPS across Punjab's cities. Never miss your bus again with accurate arrival predictions and route information.
+                        <span class="block text-amber-500 text-lg punjabi-text mt-4">
+                            ਪੰਜਾਬ ਦੇ ਸਾਰੇ ਸਿਹਰਾਂ ਵਿੱਚ ਲਾਈਵ GPS ਨਾਲ ਬੱਸ ਟਰੈਕਿੰਗ
+                        </span>
+                    </p>
+                    
+                    <!-- CTA Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-6 justify-center md:justify-start">
+                        <a href="user-app.html" class="bg-gradient-to-r from-amber-600 to-orange-600 text-white px-10 py-5 rounded-full text-xl font-bold hover:shadow-lg transform hover:scale-105 transition-all duration-300 inline-flex items-center justify-center">
+                            <i class="fas fa-rocket mr-3 text-2xl"></i>
+                            <span class="english-text">Start Tracking</span>
                         </a>
-                        <a href="#features" class="text-orange-600 px-8 py-4 rounded-lg text-lg font-semibold border-2 border-orange-600 hover:bg-orange-50 transition inline-block">
-                            Learn More
+                        <a href="#features" class="border-2 border-amber-600 text-amber-700 px-10 py-5 rounded-full text-xl font-bold hover:bg-amber-50 hover:text-amber-800 transition-all duration-300 inline-flex items-center justify-center">
+                            <i class="fas fa-info-circle mr-3 text-2xl"></i>
+                            <span class="english-text">Learn More</span>
                         </a>
                     </div>
+                    
+                    <!-- Stats -->
+                    <div class="grid grid-cols-3 gap-6 mt-12 text-center">
+                        <div class="text-amber-700">
+                            <div class="text-4xl font-bold text-orange-600">8+</div>
+                            <div class="text-sm english-text">Cities</div>
+                        </div>
+                        <div class="text-amber-700">
+                            <div class="text-4xl font-bold text-orange-600">50+</div>
+                            <div class="text-sm english-text">Routes</div>
+                        </div>
+                        <div class="text-amber-700">
+                            <div class="text-4xl font-bold text-orange-600">24/7</div>
+                            <div class="text-sm english-text">Service</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="relative">
-                    <div class="bg-orange-100 rounded-2xl p-8">
-                        <img src="https://img.icons8.com/clouds/500/bus.png" alt="Bus Illustration" class="w-full">
+                
+                <!-- Hero Image/Animation with Punjabi People -->
+                <div class="relative flex justify-center">
+                    <div class="relative">
+                        <!-- Main Bus Image Container -->
+                        <div class="bg-white/30 backdrop-blur-sm rounded-3xl p-8 floating-animation border border-amber-200">
+                            <div class="relative">
+                                <i class="fas fa-bus text-amber-700 text-9xl drop-shadow-lg"></i>
+                                <!-- GPS Signal Animation -->
+                                <div class="absolute -top-4 -right-4">
+                                    <div class="relative">
+                                        <i class="fas fa-satellite-dish text-green-600 text-3xl animate-pulse"></i>
+                                        <div class="absolute top-0 left-0 w-full h-full rounded-full border-2 border-green-500 animate-ping"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Punjabi Man with Turban -->
+                        <div class="absolute -bottom-8 -left-12 floating-animation" style="animation-delay: -1s;">
+                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-amber-200">
+                                <svg width="60" height="80" viewBox="0 0 60 80" class="punjabi-silhouette">
+                                    <!-- Turban -->
+                                    <ellipse cx="30" cy="15" rx="18" ry="12" fill="#d4b896"/>
+                                    <path d="M15 15 Q30 8 45 15 Q45 20 30 18 Q15 20 15 15" fill="#c19a6b"/>
+                                    <!-- Face -->
+                                    <circle cx="30" cy="25" r="8" fill="#e6b87d"/>
+                                    <!-- Beard -->
+                                    <path d="M22 28 Q30 35 38 28 Q38 32 30 35 Q22 32 22 28" fill="#8b4513"/>
+                                    <!-- Body -->
+                                    <rect x="22" y="35" width="16" height="25" fill="#4a90e2" rx="3"/>
+                                    <!-- Arms -->
+                                    <rect x="12" y="40" width="8" height="15" fill="#4a90e2" rx="2"/>
+                                    <rect x="40" y="40" width="8" height="15" fill="#4a90e2" rx="2"/>
+                                    <!-- Legs -->
+                                    <rect x="24" y="60" width="5" height="18" fill="#654321"/>
+                                    <rect x="31" y="60" width="5" height="18" fill="#654321"/>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Punjabi Woman -->
+                        <div class="absolute -bottom-6 -right-16 floating-animation" style="animation-delay: -2s;">
+                            <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-amber-200">
+                                <svg width="55" height="75" viewBox="0 0 55 75" class="punjabi-silhouette">
+                                    <!-- Hair/Dupatta -->
+                                    <path d="M10 12 Q27 5 45 12 Q45 25 40 20 Q27 15 15 20 Q10 25 10 12" fill="#8b4513"/>
+                                    <path d="M12 10 Q27 3 43 10 Q43 18 35 15 Q27 12 19 15 Q12 18 12 10" fill="#ff69b4" opacity="0.7"/>
+                                    <!-- Face -->
+                                    <circle cx="27" cy="22" r="7" fill="#e6b87d"/>
+                                    <!-- Body (Salwar Kameez) -->
+                                    <rect x="20" y="32" width="14" height="22" fill="#ff69b4" rx="3"/>
+                                    <!-- Dupatta -->
+                                    <path d="M18 35 Q27 32 36 35 Q36 40 32 38 Q27 36 23 38 Q18 40 18 35" fill="#ff1493" opacity="0.8"/>
+                                    <!-- Arms -->
+                                    <rect x="12" y="37" width="6" height="12" fill="#ff69b4" rx="2"/>
+                                    <rect x="37" y="37" width="6" height="12" fill="#ff69b4" rx="2"/>
+                                    <!-- Salwar (loose pants) -->
+                                    <rect x="22" y="54" width="4" height="18" fill="#8b4513"/>
+                                    <rect x="29" y="54" width="4" height="18" fill="#8b4513"/>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Floating Elements -->
+                        <div class="absolute -top-8 -left-8 bg-green-500 text-white px-4 py-2 rounded-full text-sm font-bold animate-bounce">
+                            <i class="fas fa-check mr-1"></i> ਲਾਈਵ
+                        </div>
+                        <div class="absolute -bottom-4 -right-8 bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold animate-bounce" style="animation-delay: -0.5s;">
+                            <i class="fas fa-clock mr-1"></i> ਰੀਅਲ-ਟਾਈਮ
+                        </div>
                     </div>
                 </div>
             </div>
@@ -60,48 +226,178 @@
     </section>
 
     <!-- Features Section -->
-    <section id="features" class="py-16 bg-white">
-        <div class="max-w-7xl mx-auto px-4">
-            <h2 class="text-3xl font-bold text-center mb-12">Features</h2>
+    <section id="features" class="py-20 bg-gradient-to-br from-amber-50 to-yellow-50 relative overflow-hidden">
+        <!-- Background Punjab Monuments -->
+        <div class="absolute inset-0 opacity-10">
+            <!-- Qila Mubarak Silhouette -->
+            <svg class="absolute top-10 right-10" width="100" height="120" viewBox="0 0 100 120">
+                <rect x="10" y="60" width="80" height="50" fill="#d4b896"/>
+                <rect x="20" y="40" width="60" height="30" fill="#d4b896"/>
+                <rect x="30" y="20" width="40" height="30" fill="#d4b896"/>
+                <circle cx="35" cy="15" r="8" fill="#d4b896"/>
+                <circle cx="65" cy="15" r="8" fill="#d4b896"/>
+                <rect x="45" y="5" width="10" height="20" fill="#d4b896"/>
+            </svg>
+            
+            <!-- Gurudwara Silhouette -->
+            <svg class="absolute bottom-20 left-10" width="80" height="100" viewBox="0 0 80 100">
+                <rect x="10" y="70" width="60" height="25" fill="#d4b896"/>
+                <rect x="20" y="50" width="40" height="25" fill="#d4b896"/>
+                <circle cx="40" cy="35" r="15" fill="#d4b896"/>
+                <rect x="35" y="20" width="10" height="25" fill="#d4b896"/>
+                <circle cx="40" cy="15" r="8" fill="#d4b896"/>
+            </svg>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 relative z-10">
+            <div class="text-center mb-16">
+                <h2 id="featuresTitle" class="text-5xl font-bold text-gray-800 mb-4 english-text">Advanced Features</h2>
+                <p class="text-xl text-gray-600 punjabi-text">ਆਧੁਨਿਕ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ</p>
+                <div class="w-24 h-1 bg-gradient-to-r from-amber-500 to-yellow-600 mx-auto mt-4 rounded-full"></div>
+            </div>
+            
             <div class="grid md:grid-cols-3 gap-8">
-                <div class="text-center p-6">
-                    <div class="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-location-dot text-orange-600 text-3xl"></i>
+                <div class="text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg card-hover border border-amber-200">
+                    <div class="bg-gradient-to-br from-amber-400 to-yellow-500 w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-6 glow-effect shadow-xl">
+                        <i class="fas fa-satellite-dish text-white text-5xl font-black"></i>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Live GPS Tracking</h3>
-                    <p class="text-gray-600">Real-time location updates using driver's smartphone GPS</p>
+                    <h3 id="feature1Title" class="text-2xl font-bold mb-4 text-gray-800 english-text">Real-Time GPS Tracking</h3>
+                    <p id="feature1Desc" class="text-gray-600 leading-relaxed english-text">Live location updates using driver's smartphone GPS technology</p>
+                    <div class="text-sm text-gray-500 punjabi-text mt-2">ਲਾਈਵ GPS ਟਰੈਕਿੰਗ</div>
                 </div>
-                <div class="text-center p-6">
-                    <div class="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-route text-green-600 text-3xl"></i>
+                
+                <div class="text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg card-hover border border-amber-200">
+                    <div class="bg-gradient-to-br from-green-400 to-emerald-500 w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-6 glow-effect shadow-xl">
+                        <i class="fas fa-route text-white text-5xl font-black"></i>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">Route Information</h3>
-                    <p class="text-gray-600">View all bus routes, stops, and estimated arrival times</p>
+                    <h3 id="feature2Title" class="text-2xl font-bold mb-4 text-gray-800 english-text">Smart Route Planning</h3>
+                    <p id="feature2Desc" class="text-gray-600 leading-relaxed english-text">View all bus routes, stops, and estimated arrival times</p>
+                    <div class="text-sm text-gray-500 punjabi-text mt-2">ਰੂਟ ਜਾਣਕਾਰੀ</div>
                 </div>
-                <div class="text-center p-6">
-                    <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-clock text-blue-600 text-3xl"></i>
+                
+                <div class="text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg card-hover border border-amber-200">
+                    <div class="bg-gradient-to-br from-blue-400 to-purple-500 w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-6 glow-effect shadow-xl">
+                        <i class="fas fa-clock text-white text-5xl font-black"></i>
                     </div>
-                    <h3 class="text-xl font-semibold mb-2">ETA Updates</h3>
-                    <p class="text-gray-600">Get accurate arrival time predictions for your stop</p>
+                    <h3 id="feature3Title" class="text-2xl font-bold mb-4 text-gray-800 english-text">Accurate ETA Updates</h3>
+                    <p id="feature3Desc" class="text-gray-600 leading-relaxed english-text">Get precise arrival time predictions for your bus stop</p>
+                    <div class="text-sm text-gray-500 punjabi-text mt-2">ETA ਅਪਡੇਟ</div>
+                </div>
+            </div>
+            
+            <!-- Additional Features Row -->
+            <div class="grid md:grid-cols-2 gap-8 mt-16">
+                <div class="bg-gradient-to-r from-amber-400 to-yellow-500 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-mobile-alt text-5xl mr-4 font-black"></i>
+                        <div>
+                            <h3 id="mobileTitle" class="text-2xl font-bold english-text">Mobile Application</h3>
+                            <p class="text-amber-100 punjabi-text">ਮੋਬਾਈਲ ਐਪ</p>
+                        </div>
+                    </div>
+                    <p id="mobileDesc" class="text-lg leading-relaxed english-text">Easy and fast mobile app that you can use anywhere, anytime with direct access.</p>
+                </div>
+                
+                <div class="bg-gradient-to-r from-green-400 to-blue-500 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <i class="fas fa-shield-alt text-5xl mr-4 font-black"></i>
+                        <div>
+                            <h3 id="securityTitle" class="text-2xl font-bold english-text">Safe & Secure</h3>
+                            <p class="text-green-100 punjabi-text">ਸੁਰੱਖਿਆ</p>
+                        </div>
+                    </div>
+                    <p id="securityDesc" class="text-lg leading-relaxed english-text">All your data is kept secure and 24/7 quality service is provided with reliable technology.</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Cities Covered -->
-    <section class="py-16 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4">
-            <h2 class="text-3xl font-bold text-center mb-12">Cities Covered in Punjab</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white p-4 rounded-lg shadow text-center">Chandigarh</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Ludhiana</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Amritsar</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Jalandhar</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Patiala</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Bathinda</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Mohali</div>
-                <div class="bg-white p-4 rounded-lg shadow text-center">Pathankot</div>
+    <section class="py-20 bg-gradient-to-br from-gray-900 to-gray-800 text-white relative overflow-hidden">
+        <!-- Background Pattern with Punjab Monuments -->
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-yellow-500/20"></div>
+            <!-- Golden Temple Silhouette -->
+            <svg class="absolute top-20 right-20" width="120" height="80" viewBox="0 0 120 80">
+                <rect x="10" y="50" width="100" height="25" fill="#d4b896"/>
+                <circle cx="60" cy="35" r="20" fill="#d4b896"/>
+                <rect x="55" y="15" width="10" height="25" fill="#d4b896"/>
+                <circle cx="60" cy="10" r="8" fill="#d4b896"/>
+            </svg>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 relative z-10">
+            <div class="text-center mb-16">
+                <h2 id="citiesTitle" class="text-5xl font-bold mb-4 english-text text-glow">Cities Covered in Punjab</h2>
+                <p class="text-2xl text-gray-300 punjabi-text mb-6">ਪੰਜਾਬ ਦੇ ਸਿਹਰ</p>
+                <div class="w-32 h-1 bg-gradient-to-r from-amber-400 to-yellow-400 mx-auto rounded-full"></div>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="bg-gradient-to-br from-amber-500/20 to-yellow-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-amber-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Chandigarh</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਚੰਡੀਗੜ਼</div>
+                    <div class="text-xs text-amber-300 mt-2">• 15+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-green-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Ludhiana</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਲੁਧਿਆਣਾ</div>
+                    <div class="text-xs text-green-300 mt-2">• 12+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-blue-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Amritsar</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਅਮ੍ਰਿਤਸਰ</div>
+                    <div class="text-xs text-blue-300 mt-2">• 10+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-yellow-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Jalandhar</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਜਲੰਧਰ</div>
+                    <div class="text-xs text-yellow-300 mt-2">• 8+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-pink-500/20 to-red-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-pink-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Patiala</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਪਟਿਆਲਾ</div>
+                    <div class="text-xs text-pink-300 mt-2">• 6+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-indigo-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Bathinda</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਬਠਿੰਡਾ</div>
+                    <div class="text-xs text-indigo-300 mt-2">• 5+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-teal-500/20 to-green-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-teal-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Mohali</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਮੋਹਾਲੀ</div>
+                    <div class="text-xs text-teal-300 mt-2">• 4+ Routes</div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 backdrop-blur-sm p-6 rounded-2xl text-center card-hover border border-white/10">
+                    <i class="fas fa-city text-5xl text-cyan-400 mb-4 font-black"></i>
+                    <div class="text-xl font-bold english-text">Pathankot</div>
+                    <div class="text-sm text-gray-400 punjabi-text">ਪਠਾਨਕੋਟ</div>
+                    <div class="text-xs text-cyan-300 mt-2">• 3+ Routes</div>
+                </div>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="text-center mt-16">
+                <p id="coverageText" class="text-2xl mb-8 english-text">Is your city in the list?</p>
+                <a href="user-app.html" class="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-12 py-6 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-110 transition-all duration-300 inline-flex items-center glow-effect">
+                    <i class="fas fa-search mr-3 text-2xl font-black"></i>
+                    <span id="findBusBtn" class="english-text">Find Your Bus</span>
+                </a>
             </div>
         </div>
     </section>
